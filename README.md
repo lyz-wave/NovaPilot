@@ -1,6 +1,8 @@
 # NovaPilot — Trusted Scientific Research Customer Service Agent
 
 > **2026 AI Pioneer Future Competition (飞书2026AI先锋未来大赛)** — Multi-round fusion optimization award
+>
+> [中文版](README.zh-CN.md)
 
 NovaPilot is an AI-powered intelligent service system for **scientific research customer support**. It transforms how research institutions handle multi-channel, multi-language, multi-expertise technical consulting — replacing fragmented manual workflows with a structured, evidence-driven decision engine.
 
