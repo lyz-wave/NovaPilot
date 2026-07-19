@@ -26,9 +26,13 @@ Thumbs.db
 
 # Temp
 tmp/
+.scratch/
 
 # Coverage
 coverage/
+
+# Next.js auto-generated
+next-env.d.ts
 
 # Binaries — competition deliverables (too large for git, keep as .md/.svg only)
 deliverables/*.pdf
