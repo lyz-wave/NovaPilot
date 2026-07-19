@@ -6,6 +6,18 @@
 
 NovaPilot is an AI-powered intelligent service system for **scientific research customer support**. It transforms how research institutions handle multi-channel, multi-language, multi-expertise technical consulting — replacing fragmented manual workflows with a structured, evidence-driven decision engine.
 
+## Screenshots
+
+| Customer Consultation | Expert Workbench |
+|:---:|:---:|
+| ![Consultation](screenshots/consultation.png) | ![Expert](screenshots/expert.png) |
+| Multi-turn Q&A with scientific decision cards | Evidence binding, consent escalation, approval |
+
+| Knowledge Evolution | Operations Dashboard |
+|:---:|:---:|
+| ![Knowledge](screenshots/knowledge.png) | ![Operations](screenshots/operations.png) |
+| GraphRAG knowledge base with structured memory | Quality metrics, release gates, feedback loops |
+
 ## Key Features
 
 | Module | Description |
