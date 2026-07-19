@@ -31,14 +31,14 @@ tmp/
 coverage/
 
 # Binaries — competition deliverables (too large for git, keep as .md/.svg only)
-02_最终交付文档/*.pdf
-02_最终交付文档/*.docx
-02_最终交付文档/*.zip
-02_最终交付文档/pdf/
-02_最终交付文档/NovaPilot_竞赛融合终版_交付包/*.pdf
-02_最终交付文档/NovaPilot_竞赛融合终版_交付包/*.docx
-02_最终交付文档/NovaPilot_竞赛融合终版_交付包/NovaPilot_PRD_最终版/*.pdf
-02_最终交付文档/NovaPilot_竞赛融合终版_交付包/NovaPilot_PRD_最终版/*.docx
+deliverables/*.pdf
+deliverables/*.docx
+deliverables/*.zip
+deliverables/pdf/
+deliverables/NovaPilot_竞赛融合终版_交付包/*.pdf
+deliverables/NovaPilot_竞赛融合终版_交付包/*.docx
+deliverables/NovaPilot_竞赛融合终版_交付包/NovaPilot_PRD_最终版/*.pdf
+deliverables/NovaPilot_竞赛融合终版_交付包/NovaPilot_PRD_最终版/*.docx
 
 # Historical drafts (archived locally, not needed on GitHub)
 03_历史方案与参考/

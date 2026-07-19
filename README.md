@@ -31,7 +31,6 @@ NovaPilot is an AI-powered intelligent service system for **scientific research 
 ## Getting Started
 
 ```bash
-cd 01_可运行源码
 npm install
 npm run dev
 ```
@@ -56,15 +55,14 @@ npm run build
 ## Project Structure
 
 ```
-01_可运行源码/             ← Runable source code (Next.js app)
-  src/
-    app/                  ← Pages & API routes
-    components/           ← 7 UI components
-    domain/               ← Domain models + tests
-  docs/
-    adr/                  ← 13 Architecture Decision Records
-    agents/               ← Agent collaboration rules
-02_最终交付文档/           ← Selected deliverables
+src/                      ← Runable source code (Next.js app)
+  app/                    ← Pages & API routes
+  components/             ← 7 UI components
+  domain/                 ← Domain models + tests
+docs/
+  adr/                    ← 13 Architecture Decision Records
+  agents/                 ← Agent collaboration rules
+deliverables/             ← Selected competition deliverables
   *.md                    ← Final proposal outlines
   *.svg                   ← Architecture diagrams
   PRD/                    ← Product Requirements Document
@@ -72,10 +70,10 @@ npm run build
 
 ## ADR Highlights
 
-- [ADR-0001](01_可运行源码/docs/adr/0001-define-prd-as-blueprint-with-trusted-mvp.md) — PRD as blueprint with trusted MVP
-- [ADR-0004](01_可运行源码/docs/adr/0004-make-scientific-decision-card-the-primary-artifact.md) — Scientific Decision Card as primary artifact
-- [ADR-0008](01_可运行源码/docs/adr/0008-use-one-knowledge-base-for-three-language-service.md) — Single KB for three-language service
-- [ADR-0009](01_可运行源码/docs/adr/0009-govern-evolution-through-candidates-and-release-gates.md) — Release gate governance
+- [ADR-0001](docs/adr/0001-define-prd-as-blueprint-with-trusted-mvp.md) — PRD as blueprint with trusted MVP
+- [ADR-0004](docs/adr/0004-make-scientific-decision-card-the-primary-artifact.md) — Scientific Decision Card as primary artifact
+- [ADR-0008](docs/adr/0008-use-one-knowledge-base-for-three-language-service.md) — Single KB for three-language service
+- [ADR-0009](docs/adr/0009-govern-evolution-through-candidates-and-release-gates.md) — Release gate governance
 
 ## License
 
