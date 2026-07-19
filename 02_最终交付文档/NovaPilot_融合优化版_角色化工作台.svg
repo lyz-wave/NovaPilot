@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#123B5D" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      text { font-family: "STHeiti", "PingFang SC", "Microsoft YaHei", sans-serif; }
+      .title { font-size: 34px; font-weight: 700; fill: #123B5D; }
+      .sub { font-size: 17px; fill: #667085; }
+      .role { font-size: 22px; font-weight: 700; fill: #123B5D; }
+      .mode { font-size: 14px; font-weight: 700; fill: #0F8B8D; letter-spacing: 1px; }
+      .label { font-size: 14px; font-weight: 700; fill: #2E74B5; }
+      .body { font-size: 14px; fill: #263746; }
+      .muted { font-size: 12px; fill: #667085; }
+      .button { font-size: 13px; font-weight: 700; fill: #FFFFFF; }
+    </style>
+  </defs>
+  <rect width="1200" height="720" fill="#F7F9FC"/>
+  <text x="64" y="62" class="title">四角色工作台：同一科研项目，不同决策视图</text>
+  <text x="64" y="94" class="sub">角色只决定默认信息密度与操作方式；关键科研事实、证据与项目状态始终共用同一底座。</text>
+
+  <!-- PI -->
+  <g filter="url(#shadow)">
+    <rect x="64" y="130" width="520" height="245" rx="18" fill="#FFFFFF"/>
+  </g>
+  <rect x="64" y="130" width="8" height="245" rx="4" fill="#2E74B5"/>
+  <text x="94" y="168" class="role">实验室 PI</text>
+  <text x="465" y="166" text-anchor="end" class="mode">快速决策</text>
+  <line x1="94" y1="184" x2="552" y2="184" stroke="#D7DEE8"/>
+  <text x="94" y="214" class="label">首屏</text>
+  <text x="154" y="214" class="body">一句话结论 · 方案 A/B · 风险与发表潜力</text>
+  <rect x="94" y="232" width="210" height="72" rx="10" fill="#E8EEF5"/>
+  <text x="110" y="257" class="label">稳健方案</text>
+  <text x="110" y="280" class="body">证据充分 · 周期可控</text>
+  <rect x="320" y="232" width="232" height="72" rx="10" fill="#E7F4F4"/>
+  <text x="336" y="257" class="label">探索方案</text>
+  <text x="336" y="280" class="body">创新更高 · 需专家确认</text>
+  <rect x="94" y="321" width="126" height="32" rx="8" fill="#2E74B5"/>
+  <text x="157" y="342" text-anchor="middle" class="button">查看证据</text>
+  <rect x="232" y="321" width="146" height="32" rx="8" fill="#0F8B8D"/>
+  <text x="305" y="342" text-anchor="middle" class="button">预约技术沟通</text>
+  <text x="552" y="343" text-anchor="end" class="muted">预算 · 周期 · 风险</text>
+
+  <!-- Postdoc -->
+  <g filter="url(#shadow)">
+    <rect x="616" y="130" width="520" height="245" rx="18" fill="#FFFFFF"/>
+  </g>
+  <rect x="616" y="130" width="8" height="245" rx="4" fill="#7153A6"/>
+  <text x="646" y="168" class="role">博士后</text>
+  <text x="1104" y="166" text-anchor="end" class="mode">专业协作</text>
+  <line x1="646" y1="184" x2="1104" y2="184" stroke="#D7DEE8"/>
+  <text x="646" y="214" class="label">参数工作台</text>
+  <rect x="646" y="230" width="458" height="82" rx="10" fill="#F2EEFA"/>
+  <text x="664" y="254" class="body">样本状态　[ FFPE ▼ ]　　分析目标　[ 差异表达 ▼ ]</text>
+  <text x="664" y="280" class="body">建库策略　[ 待比较 ]　　测序深度　[ 自动计算 ]</text>
+  <text x="664" y="300" class="muted">每次修改保留版本、依据与可复现参数</text>
+  <rect x="646" y="321" width="126" height="32" rx="8" fill="#7153A6"/>
+  <text x="709" y="342" text-anchor="middle" class="button">运行比较</text>
+  <rect x="784" y="321" width="126" height="32" rx="8" fill="#2E74B5"/>
+  <text x="847" y="342" text-anchor="middle" class="button">打开文献</text>
+  <text x="1104" y="343" text-anchor="end" class="muted">参数 · 文献 · 复现</text>
+
+  <!-- Student -->
+  <g filter="url(#shadow)">
+    <rect x="64" y="407" width="520" height="245" rx="18" fill="#FFFFFF"/>
+  </g>
+  <rect x="64" y="407" width="8" height="245" rx="4" fill="#167D5A"/>
+  <text x="94" y="445" class="role">研究生</text>
+  <text x="552" y="443" text-anchor="end" class="mode">学习引导</text>
+  <line x1="94" y1="461" x2="552" y2="461" stroke="#D7DEE8"/>
+  <text x="94" y="491" class="label">三步向导</text>
+  <circle cx="118" cy="522" r="16" fill="#167D5A"/><text x="118" y="527" text-anchor="middle" class="button">1</text>
+  <line x1="134" y1="522" x2="220" y2="522" stroke="#B8DCCB" stroke-width="5"/>
+  <circle cx="240" cy="522" r="16" fill="#B8DCCB"/><text x="240" y="527" text-anchor="middle" class="button">2</text>
+  <line x1="256" y1="522" x2="342" y2="522" stroke="#D7DEE8" stroke-width="5"/>
+  <circle cx="362" cy="522" r="16" fill="#D7DEE8"/><text x="362" y="527" text-anchor="middle" class="button">3</text>
+  <text x="94" y="558" class="body">研究问题 → 样本条件 → 方案与检查清单</text>
+  <rect x="94" y="578" width="144" height="32" rx="8" fill="#167D5A"/>
+  <text x="166" y="599" text-anchor="middle" class="button">继续完善方案</text>
+  <text x="552" y="600" text-anchor="end" class="muted">术语解释 · 常见错误</text>
+
+  <!-- Enterprise -->
+  <g filter="url(#shadow)">
+    <rect x="616" y="407" width="520" height="245" rx="18" fill="#FFFFFF"/>
+  </g>
+  <rect x="616" y="407" width="8" height="245" rx="4" fill="#A46300"/>
+  <text x="646" y="445" class="role">企业研发人员</text>
+  <text x="1104" y="443" text-anchor="end" class="mode">交付治理</text>
+  <line x1="646" y1="461" x2="1104" y2="461" stroke="#D7DEE8"/>
+  <text x="646" y="491" class="label">项目看板</text>
+  <rect x="646" y="507" width="138" height="70" rx="10" fill="#FFF4DB"/>
+  <text x="664" y="531" class="label">批次状态</text>
+  <text x="664" y="556" class="body">8 / 10 已完成</text>
+  <rect x="798" y="507" width="138" height="70" rx="10" fill="#F4F6F9"/>
+  <text x="816" y="531" class="label">SLA</text>
+  <text x="816" y="556" class="body">剩余 4 天</text>
+  <rect x="950" y="507" width="154" height="70" rx="10" fill="#FDECEC"/>
+  <text x="968" y="531" class="label">待审批</text>
+  <text x="968" y="556" class="body">数据出境 1 项</text>
+  <rect x="646" y="590" width="126" height="32" rx="8" fill="#A46300"/>
+  <text x="709" y="611" text-anchor="middle" class="button">查看审计</text>
+  <rect x="784" y="590" width="126" height="32" rx="8" fill="#2E74B5"/>
+  <text x="847" y="611" text-anchor="middle" class="button">下载交付物</text>
+  <text x="1104" y="612" text-anchor="end" class="muted">权限 · 批次 · SLA</text>
+
+  <text x="600" y="692" text-anchor="middle" class="muted">所有视图共享：项目事实 · 证据链 · 决策版本 · 专家协作 · 权限审计</text>
+</svg>

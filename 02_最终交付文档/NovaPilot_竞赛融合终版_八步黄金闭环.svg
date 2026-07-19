@@ -1,0 +1,165 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="820" viewBox="0 0 1200 820" role="img" aria-labelledby="title desc">
+  <title id="title">NovaPilot八步黄金闭环Demo</title>
+  <desc id="desc">以FFPE肿瘤RNA测序咨询为示例，展示跨语言建档、最小追问、有据回答、主动转专家、受治理沉淀、信任时刻、授权推荐和指标看板八个步骤。</desc>
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="140%">
+      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#16324F" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 Z" fill="#8191A5"/>
+    </marker>
+    <style>
+      .cn{font-family:"PingFang SC","Microsoft YaHei","STHeiti",sans-serif}
+      .title{font-size:33px;font-weight:700;fill:#123B5D}
+      .subtitle{font-size:15px;fill:#667085}
+      .question{font-size:15px;font-weight:700;fill:#22384A}
+      .stepNo{font-size:15px;font-weight:700;fill:#FFFFFF}
+      .stepTitle{font-size:17px;font-weight:700;fill:#123B5D}
+      .body{font-size:12px;fill:#526273}
+      .tag{font-size:11px;font-weight:700}
+      .foot{font-size:12px;fill:#667085}
+    </style>
+  </defs>
+  <rect width="1200" height="820" fill="#F3F6FA"/>
+  <text x="600" y="48" text-anchor="middle" class="cn title">NovaPilot 八步黄金闭环 Demo</text>
+  <text x="600" y="76" text-anchor="middle" class="cn subtitle">一条动线同时证明：可信回答、无损转专家、受治理进化、科学信任与授权式转化</text>
+  <rect x="95" y="98" width="1010" height="54" rx="14" fill="#FFFFFF" stroke="#C9D6E3"/>
+  <text x="125" y="130" class="cn question">客户问题：</text>
+  <text x="225" y="130" class="cn body">“我们有24份保存时间不一致的FFPE肿瘤样本，想比较两组RNA表达差异，应该怎么设计？”</text>
+
+  <!-- arrows row 1 -->
+  <path d="M337 264 L367 264" stroke="#8191A5" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M603 264 L633 264" stroke="#8191A5" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M869 264 L899 264" stroke="#8191A5" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M1010 350 C1010 395 990 411 944 411" fill="none" stroke="#8191A5" stroke-width="2" marker-end="url(#arrow)"/>
+  <!-- arrows row 2 reverse -->
+  <path d="M899 520 L869 520" stroke="#8191A5" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M633 520 L603 520" stroke="#8191A5" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M367 520 L337 520" stroke="#8191A5" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Card 1 -->
+  <g filter="url(#shadow)">
+    <rect x="75" y="184" width="260" height="166" rx="16" fill="#FFFFFF" stroke="#B9C6D5"/>
+    <rect x="75" y="184" width="260" height="10" rx="5" fill="#64748B"/>
+  </g>
+  <circle cx="108" cy="222" r="18" fill="#64748B"/><text x="108" y="228" text-anchor="middle" class="cn stepNo">1</text>
+  <text x="138" y="218" class="cn stepTitle">跨语言建档</text>
+  <rect x="244" y="204" width="66" height="25" rx="12" fill="#EEF1F5"/>
+  <text x="277" y="221" text-anchor="middle" class="cn tag" fill="#64748B">中 / 英 / 日</text>
+  <text x="98" y="258" class="cn body">
+    <tspan x="98" dy="0">识别角色与语言，提取人源、FFPE、</tspan>
+    <tspan x="98" dy="21">24份样本和差异表达目标；原始表述</tspan>
+    <tspan x="98" dy="21">进入可确认、可版本化的项目事实。</tspan>
+  </text>
+
+  <!-- Card 2 -->
+  <g filter="url(#shadow)">
+    <rect x="341" y="184" width="260" height="166" rx="16" fill="#FFFFFF" stroke="#A8C7E6"/>
+    <rect x="341" y="184" width="260" height="10" rx="5" fill="#2E74B5"/>
+  </g>
+  <circle cx="374" cy="222" r="18" fill="#2E74B5"/><text x="374" y="228" text-anchor="middle" class="cn stepNo">2</text>
+  <text x="404" y="218" class="cn stepTitle">最小必要追问</text>
+  <rect x="510" y="204" width="66" height="25" rx="12" fill="#E8F1FA"/>
+  <text x="543" y="221" text-anchor="middle" class="cn tag" fill="#2E74B5">不盲答</text>
+  <text x="364" y="258" class="cn body">
+    <tspan x="364" dy="0">只询问会改变方案的DV200、配对、</tspan>
+    <tspan x="364" dy="21">批次、提取方式、组织量和预算，并</tspan>
+    <tspan x="364" dy="21">解释每个问题为何必要。</tspan>
+  </text>
+
+  <!-- Card 3 -->
+  <g filter="url(#shadow)">
+    <rect x="607" y="184" width="260" height="166" rx="16" fill="#FFFFFF" stroke="#8ED0B7"/>
+    <rect x="607" y="184" width="260" height="10" rx="5" fill="#167D5A"/>
+  </g>
+  <circle cx="640" cy="222" r="18" fill="#167D5A"/><text x="640" y="228" text-anchor="middle" class="cn stepNo">3</text>
+  <text x="670" y="218" class="cn stepTitle">有据回答</text>
+  <rect x="776" y="204" width="66" height="25" rx="12" fill="#E8F5EF"/>
+  <text x="809" y="221" text-anchor="middle" class="cn tag" fill="#167D5A">可溯源</text>
+  <text x="630" y="258" class="cn body">
+    <tspan x="630" dy="0">检索现行SOP、方法文献和历史案例，</tspan>
+    <tspan x="630" dy="21">生成主方案＋备选；逐条展示证据、</tspan>
+    <tspan x="630" dy="21">适用范围、限制和失败风险。</tspan>
+  </text>
+
+  <!-- Card 4 -->
+  <g filter="url(#shadow)">
+    <rect x="873" y="184" width="260" height="166" rx="16" fill="#FFFFFF" stroke="#E4B56F"/>
+    <rect x="873" y="184" width="260" height="10" rx="5" fill="#C87400"/>
+  </g>
+  <circle cx="906" cy="222" r="18" fill="#C87400"/><text x="906" y="228" text-anchor="middle" class="cn stepNo">4</text>
+  <text x="936" y="218" class="cn stepTitle">主动转专家</text>
+  <rect x="1042" y="204" width="66" height="25" rx="12" fill="#FFF3E1"/>
+  <text x="1075" y="221" text-anchor="middle" class="cn tag" fill="#A46300">不硬答</text>
+  <text x="896" y="258" class="cn body">
+    <tspan x="896" dy="0">质量过低、证据冲突或客户要求非标</tspan>
+    <tspan x="896" dy="21">交付时，携带完整事实、证据、尝试、</tspan>
+    <tspan x="896" dy="21">风险和待决策项一次性交接。</tspan>
+  </text>
+
+  <!-- Card 8 -->
+  <g filter="url(#shadow)">
+    <rect x="75" y="438" width="260" height="166" rx="16" fill="#FFFFFF" stroke="#C6B5EB"/>
+    <rect x="75" y="438" width="260" height="10" rx="5" fill="#7153A6"/>
+  </g>
+  <circle cx="108" cy="476" r="18" fill="#7153A6"/><text x="108" y="482" text-anchor="middle" class="cn stepNo">8</text>
+  <text x="138" y="472" class="cn stepTitle">指标看板收尾</text>
+  <rect x="244" y="458" width="66" height="25" rx="12" fill="#F2EEFA"/>
+  <text x="277" y="475" text-anchor="middle" class="cn tag" fill="#7153A6">安全门禁</text>
+  <text x="98" y="512" class="cn body">
+    <tspan x="98" dy="0">展示正确解决率、恰当升级率、自信</tspan>
+    <tspan x="98" dy="21">错答率，以及引用支持、复开率、</tspan>
+    <tspan x="98" dy="21">专家处理时长和授权转化漏斗。</tspan>
+  </text>
+
+  <!-- Card 7 -->
+  <g filter="url(#shadow)">
+    <rect x="341" y="438" width="260" height="166" rx="16" fill="#FFFFFF" stroke="#EFA7CC"/>
+    <rect x="341" y="438" width="260" height="10" rx="5" fill="#C72E75"/>
+  </g>
+  <circle cx="374" cy="476" r="18" fill="#C72E75"/><text x="374" y="482" text-anchor="middle" class="cn stepNo">7</text>
+  <text x="404" y="472" class="cn stepTitle">授权式推荐</text>
+  <rect x="510" y="458" width="66" height="25" rx="12" fill="#FCEAF3"/>
+  <text x="543" y="475" text-anchor="middle" class="cn tag" fill="#C72E75">明确标注</text>
+  <text x="364" y="512" class="cn body">
+    <tspan x="364" dy="0">客户主动询问周期、报价或预约专家</tspan>
+    <tspan x="364" dy="21">后，独立CTA展示服务适配、限制与</tspan>
+    <tspan x="364" dy="21">替代方案；客户授权后才进入CRM。</tspan>
+  </text>
+
+  <!-- Card 6 -->
+  <g filter="url(#shadow)">
+    <rect x="607" y="438" width="260" height="166" rx="16" fill="#FFFFFF" stroke="#AFC1E7"/>
+    <rect x="607" y="438" width="260" height="10" rx="5" fill="#465F9E"/>
+  </g>
+  <circle cx="640" cy="476" r="18" fill="#465F9E"/><text x="640" y="482" text-anchor="middle" class="cn stepNo">6</text>
+  <text x="670" y="472" class="cn stepTitle">信任时刻</text>
+  <rect x="776" y="458" width="66" height="25" rx="12" fill="#EDF1FA"/>
+  <text x="809" y="475" text-anchor="middle" class="cn tag" fill="#465F9E">诚实优先</text>
+  <text x="630" y="512" class="cn body">
+    <tspan x="630" dy="0">若科学最优并非诺禾主推方案，系统</tspan>
+    <tspan x="630" dy="21">如实说明，并给出诺禾能够提供的</tspan>
+    <tspan x="630" dy="21">相邻价值，保护长期咨询信任。</tspan>
+  </text>
+
+  <!-- Card 5 -->
+  <g filter="url(#shadow)">
+    <rect x="873" y="438" width="260" height="166" rx="16" fill="#FFFFFF" stroke="#84C5BE"/>
+    <rect x="873" y="438" width="260" height="10" rx="5" fill="#0F8B8D"/>
+  </g>
+  <circle cx="906" cy="476" r="18" fill="#0F8B8D"/><text x="906" y="482" text-anchor="middle" class="cn stepNo">5</text>
+  <text x="936" y="472" class="cn stepTitle">受治理沉淀</text>
+  <rect x="1042" y="458" width="66" height="25" rx="12" fill="#E7F4F4"/>
+  <text x="1075" y="475" text-anchor="middle" class="cn tag" fill="#0F8B8D">闭环可见</text>
+  <text x="896" y="512" class="cn body">
+    <tspan x="896" dy="0">专家结论成为带证据、作用域、反例</tspan>
+    <tspan x="896" dy="21">和有效期的候选；项目内可见，进入</tspan>
+    <tspan x="896" dy="21">生产须经NovaBench、审批和灰度。</tspan>
+  </text>
+
+  <rect x="95" y="648" width="1010" height="98" rx="16" fill="#FFFFFF" stroke="#CAD6E2"/>
+  <text x="120" y="679" class="cn stepTitle">Demo的三个记忆点</text>
+  <text x="120" y="711" class="cn body">① 克制：证据不足时敢于弃答并主动升级　　② 进化：进化的是候选知识与策略，不是黑箱直接改写生产</text>
+  <text x="120" y="735" class="cn body">③ 信任：科学建议与商业推荐物理隔离，短期不硬推，长期形成专业信任复利</text>
+  <text x="600" y="786" text-anchor="middle" class="cn foot">竞赛演示建议控制在3分钟：前4步证明可信，后4步证明组织学习、品牌信任与增长价值。</text>
+</svg>

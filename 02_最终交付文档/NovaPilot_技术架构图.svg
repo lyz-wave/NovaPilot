@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1180" viewBox="0 0 1600 1180" role="img" aria-labelledby="title desc">
+  <title id="title">NovaPilot AI驱动科研客户技术支持与咨询服务体系技术架构</title>
+  <desc id="desc">展示体验渠道、API身份、有状态智能体中枢、专业智能体、循证知识、科研工具、人机协同、可信治理、自进化和基础设施之间的关系。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F7FAFC"/>
+      <stop offset="100%" stop-color="#EEF5F7"/>
+    </linearGradient>
+    <linearGradient id="navyGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#123B5D"/>
+      <stop offset="100%" stop-color="#1F5E7A"/>
+    </linearGradient>
+    <linearGradient id="tealGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0F8B8D"/>
+      <stop offset="100%" stop-color="#19A3A5"/>
+    </linearGradient>
+    <linearGradient id="blueGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2E74B5"/>
+      <stop offset="100%" stop-color="#4B91CF"/>
+    </linearGradient>
+    <filter id="shadow" x="-15%" y="-20%" width="130%" height="150%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0B2545" flood-opacity="0.13"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2E74B5"/>
+    </marker>
+    <marker id="arrowTeal" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0F8B8D"/>
+    </marker>
+    <style>
+      .font { font-family: "PingFang SC","Microsoft YaHei","Noto Sans CJK SC",Arial,sans-serif; }
+      .title { font-size: 38px; font-weight: 700; fill: #123B5D; }
+      .subtitle { font-size: 18px; fill: #667085; }
+      .layerLabel { font-size: 19px; font-weight: 700; fill: #FFFFFF; letter-spacing: 1px; }
+      .boxTitle { font-size: 18px; font-weight: 700; fill: #123B5D; }
+      .boxText { font-size: 14px; fill: #344054; }
+      .whiteTitle { font-size: 19px; font-weight: 700; fill: #FFFFFF; }
+      .whiteText { font-size: 14px; fill: #EAF4F8; }
+      .small { font-size: 12px; fill: #667085; }
+      .tag { font-size: 12px; font-weight: 600; fill: #0F6F70; }
+      .line { fill: none; stroke: #2E74B5; stroke-width: 2.5; marker-end: url(#arrow); }
+      .tealLine { fill: none; stroke: #0F8B8D; stroke-width: 2.5; marker-end: url(#arrowTeal); }
+      .dash { fill: none; stroke: #0F8B8D; stroke-width: 2.5; stroke-dasharray: 9 7; marker-end: url(#arrowTeal); }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1180" fill="url(#bg)"/>
+  <g class="font">
+    <text x="70" y="62" class="title">NovaPilot 科研服务操作系统｜整体技术架构</text>
+    <text x="70" y="94" class="subtitle">有状态智能体中枢 × 循证知识 × 科研工具执行 × 专家协同 × 可信自进化</text>
+
+    <!-- Experience layer -->
+    <rect x="70" y="125" width="1460" height="112" rx="22" fill="#FFFFFF" stroke="#C9D8E5" stroke-width="2" filter="url(#shadow)"/>
+    <rect x="70" y="125" width="170" height="112" rx="22" fill="url(#blueGrad)"/>
+    <rect x="218" y="125" width="22" height="112" fill="url(#blueGrad)"/>
+    <text x="155" y="174" text-anchor="middle" class="layerLabel">体验与渠道层</text>
+    <text x="155" y="201" text-anchor="middle" class="whiteText">统一科研服务入口</text>
+
+    <g transform="translate(275,145)">
+      <rect width="210" height="72" rx="14" fill="#E8EEF5"/>
+      <text x="105" y="28" text-anchor="middle" class="boxTitle">现有AI科研助手</text>
+      <text x="105" y="51" text-anchor="middle" class="boxText">Web / 移动端 / 飞书</text>
+    </g>
+    <g transform="translate(510,145)">
+      <rect width="210" height="72" rx="14" fill="#E7F4F4"/>
+      <text x="105" y="28" text-anchor="middle" class="boxTitle">角色化工作台</text>
+      <text x="105" y="51" text-anchor="middle" class="boxText">PI / 博后 / 学生 / 企业</text>
+    </g>
+    <g transform="translate(745,145)">
+      <rect width="210" height="72" rx="14" fill="#F2EEFA"/>
+      <text x="105" y="28" text-anchor="middle" class="boxTitle">多模态交互</text>
+      <text x="105" y="51" text-anchor="middle" class="boxText">文档 / 图表 / 序列 / 语音</text>
+    </g>
+    <g transform="translate(980,145)">
+      <rect width="210" height="72" rx="14" fill="#FFF4DB"/>
+      <text x="105" y="28" text-anchor="middle" class="boxTitle">项目驾驶舱</text>
+      <text x="105" y="51" text-anchor="middle" class="boxText">方案 / 任务 / 证据 / 版本</text>
+    </g>
+    <g transform="translate(1215,145)">
+      <rect width="275" height="72" rx="14" fill="#E8F5EF"/>
+      <text x="137.5" y="28" text-anchor="middle" class="boxTitle">中英日实时交流</text>
+      <text x="137.5" y="51" text-anchor="middle" class="boxText">跨语言检索 / 语音 / 双语纪要</text>
+    </g>
+
+    <!-- API -->
+    <path d="M800 237 L800 271" class="line"/>
+    <rect x="230" y="271" width="1140" height="70" rx="18" fill="#FFFFFF" stroke="#AFC7DA" stroke-width="2"/>
+    <text x="270" y="299" class="boxTitle">API与身份控制</text>
+    <text x="270" y="323" class="boxText">FastAPI · REST/SSE · OIDC · RBAC+ABAC · 租户隔离 · 限流 · 审计 · 客户授权</text>
+    <rect x="1170" y="287" width="165" height="38" rx="19" fill="#FDECEC"/>
+    <text x="1252.5" y="311" text-anchor="middle" class="tag" fill="#A63A3A">数据边界与最小权限</text>
+
+    <!-- Core -->
+    <path d="M800 341 L800 375" class="line"/>
+    <rect x="70" y="375" width="1460" height="320" rx="24" fill="#FFFFFF" stroke="#B8CAD8" stroke-width="2" filter="url(#shadow)"/>
+    <rect x="70" y="375" width="170" height="320" rx="24" fill="url(#navyGrad)"/>
+    <rect x="218" y="375" width="22" height="320" fill="url(#navyGrad)"/>
+    <text x="155" y="492" text-anchor="middle" class="layerLabel">智能体运行层</text>
+    <text x="155" y="521" text-anchor="middle" class="whiteText">可恢复 · 可审计</text>
+    <text x="155" y="545" text-anchor="middle" class="whiteText">可人工介入</text>
+
+    <rect x="275" y="405" width="500" height="118" rx="18" fill="url(#navyGrad)"/>
+    <text x="525" y="438" text-anchor="middle" class="whiteTitle">有状态科研服务中枢｜LangGraph</text>
+    <text x="315" y="468" class="whiteText">意图路由</text>
+    <text x="435" y="468" class="whiteText">项目记忆</text>
+    <text x="555" y="468" class="whiteText">任务计划</text>
+    <text x="675" y="468" class="whiteText">检查点恢复</text>
+    <text x="315" y="495" class="whiteText">模型路由</text>
+    <text x="435" y="495" class="whiteText">工具权限</text>
+    <text x="555" y="495" class="whiteText">成本预算</text>
+    <text x="675" y="495" class="whiteText">人工审批</text>
+
+    <rect x="805" y="405" width="300" height="118" rx="18" fill="#E7F4F4" stroke="#0F8B8D" stroke-width="2"/>
+    <text x="955" y="438" text-anchor="middle" class="boxTitle">科研项目记忆图谱</text>
+    <text x="835" y="468" class="boxText">目标 / 物种 / 样本 / 预算</text>
+    <text x="835" y="493" class="boxText">来源 / 置信度 / 确认状态 / 版本</text>
+
+    <rect x="1135" y="405" width="355" height="118" rx="18" fill="#FFF4DB" stroke="#D59A28" stroke-width="2"/>
+    <text x="1312.5" y="438" text-anchor="middle" class="boxTitle">统一模型与推理网关</text>
+    <text x="1165" y="468" class="boxText">私有模型（vLLM）/ 外部强模型</text>
+    <text x="1165" y="493" class="boxText">按质量、成本、延迟、敏感度动态路由</text>
+
+    <path d="M525 523 L525 548" class="line"/>
+    <g transform="translate(275,552)">
+      <rect width="278" height="112" rx="16" fill="#E8EEF5" stroke="#2E74B5" stroke-width="2"/>
+      <text x="139" y="31" text-anchor="middle" class="boxTitle">实验方案设计智能体</text>
+      <text x="24" y="60" class="boxText">设计变量 · 样本约束 · 风险</text>
+      <text x="24" y="84" class="boxText">输出：多方案比较与决策卡</text>
+    </g>
+    <g transform="translate(573,552)">
+      <rect width="278" height="112" rx="16" fill="#E7F4F4" stroke="#0F8B8D" stroke-width="2"/>
+      <text x="139" y="31" text-anchor="middle" class="boxTitle">平台与产品选型智能体</text>
+      <text x="24" y="60" class="boxText">读长 · 通量 · 成本 · 周期</text>
+      <text x="24" y="84" class="boxText">输出：适配度、依据与替代项</text>
+    </g>
+    <g transform="translate(871,552)">
+      <rect width="278" height="112" rx="16" fill="#F2EEFA" stroke="#7153A6" stroke-width="2"/>
+      <text x="139" y="31" text-anchor="middle" class="boxTitle">数据分析推荐智能体</text>
+      <text x="24" y="60" class="boxText">流程 · 工具 · 参数 · 统计假设</text>
+      <text x="24" y="84" class="boxText">输出：可执行工作流与质控点</text>
+    </g>
+    <g transform="translate(1169,552)">
+      <rect width="321" height="112" rx="16" fill="#E8F5EF" stroke="#167D5A" stroke-width="2"/>
+      <text x="160.5" y="31" text-anchor="middle" class="boxTitle">结果解读与论文智能体</text>
+      <text x="24" y="60" class="boxText">证据综合 · 图表 · 局限 · 写作</text>
+      <text x="24" y="84" class="boxText">输出：可追溯解读与论文材料</text>
+    </g>
+
+    <!-- Knowledge and tools -->
+    <path d="M555 695 L555 733" class="line"/>
+    <path d="M1045 695 L1045 733" class="line"/>
+    <rect x="70" y="733" width="700" height="243" rx="22" fill="#FFFFFF" stroke="#AFC7DA" stroke-width="2" filter="url(#shadow)"/>
+    <rect x="70" y="733" width="170" height="243" rx="22" fill="url(#blueGrad)"/>
+    <rect x="218" y="733" width="22" height="243" fill="url(#blueGrad)"/>
+    <text x="155" y="832" text-anchor="middle" class="layerLabel">循证知识层</text>
+    <text x="155" y="859" text-anchor="middle" class="whiteText">回答必须绑定证据</text>
+
+    <rect x="270" y="760" width="220" height="82" rx="14" fill="#E8EEF5"/>
+    <text x="380" y="789" text-anchor="middle" class="boxTitle">混合RAG</text>
+    <text x="380" y="815" text-anchor="middle" class="boxText">BM25 + 向量 + Reranker</text>
+    <rect x="510" y="760" width="225" height="82" rx="14" fill="#E7F4F4"/>
+    <text x="622.5" y="789" text-anchor="middle" class="boxTitle">科研知识图谱</text>
+    <text x="622.5" y="815" text-anchor="middle" class="boxText">实体、约束、因果与风险</text>
+    <rect x="270" y="862" width="220" height="82" rx="14" fill="#F2EEFA"/>
+    <text x="380" y="891" text-anchor="middle" class="boxTitle">证据核验器</text>
+    <text x="380" y="917" text-anchor="middle" class="boxText">DOI/PMID · 引用 · 适用性</text>
+    <rect x="510" y="862" width="225" height="82" rx="14" fill="#F4F6F9"/>
+    <text x="622.5" y="891" text-anchor="middle" class="boxTitle">知识资产</text>
+    <text x="622.5" y="917" text-anchor="middle" class="boxText">SOP / FAQ / 工单 / SCI</text>
+
+    <rect x="800" y="733" width="730" height="243" rx="22" fill="#FFFFFF" stroke="#A8D3D4" stroke-width="2" filter="url(#shadow)"/>
+    <rect x="800" y="733" width="170" height="243" rx="22" fill="url(#tealGrad)"/>
+    <rect x="948" y="733" width="22" height="243" fill="url(#tealGrad)"/>
+    <text x="885" y="832" text-anchor="middle" class="layerLabel">科研工具层</text>
+    <text x="885" y="859" text-anchor="middle" class="whiteText">从回答走向执行</text>
+
+    <rect x="1000" y="760" width="220" height="82" rx="14" fill="#E7F4F4"/>
+    <text x="1110" y="789" text-anchor="middle" class="boxTitle">文献与数据库</text>
+    <text x="1110" y="815" text-anchor="middle" class="boxText">PubMed / Crossref / 内部库</text>
+    <rect x="1240" y="760" width="255" height="82" rx="14" fill="#E8F5EF"/>
+    <text x="1367.5" y="789" text-anchor="middle" class="boxTitle">生信执行沙箱</text>
+    <text x="1367.5" y="815" text-anchor="middle" class="boxText">Nextflow / Snakemake / K8s</text>
+    <rect x="1000" y="862" width="220" height="82" rx="14" fill="#FFF4DB"/>
+    <text x="1110" y="891" text-anchor="middle" class="boxTitle">科研计算工具</text>
+    <text x="1110" y="917" text-anchor="middle" class="boxText">质控 / 测序量 / 统计 / 作图</text>
+    <rect x="1240" y="862" width="255" height="82" rx="14" fill="#FDECEC"/>
+    <text x="1367.5" y="891" text-anchor="middle" class="boxTitle">业务系统连接</text>
+    <text x="1367.5" y="917" text-anchor="middle" class="boxText">CRM / 工单 / 报价 / 样本系统</text>
+
+    <!-- Bottom operations -->
+    <path d="M420 976 L420 1010" class="line"/>
+    <path d="M1165 976 L1165 1010" class="line"/>
+    <rect x="70" y="1010" width="1460" height="112" rx="22" fill="#FFFFFF" stroke="#C9D8E5" stroke-width="2"/>
+    <rect x="90" y="1030" width="330" height="72" rx="16" fill="#FDECEC" stroke="#A63A3A" stroke-width="2"/>
+    <text x="255" y="1058" text-anchor="middle" class="boxTitle">NovaGuard 可信控制塔</text>
+    <text x="255" y="1084" text-anchor="middle" class="boxText">轨迹监督 · 风险门控 · 权限 · 回滚</text>
+
+    <rect x="445" y="1030" width="330" height="72" rx="16" fill="#FFF4DB" stroke="#D59A28" stroke-width="2"/>
+    <text x="610" y="1058" text-anchor="middle" class="boxTitle">解决方案专家工作台</text>
+    <text x="610" y="1084" text-anchor="middle" class="boxText">上下文交接 · 审核 · 接管 · 反馈</text>
+
+    <rect x="800" y="1030" width="330" height="72" rx="16" fill="#E8EEF5" stroke="#2E74B5" stroke-width="2"/>
+    <text x="965" y="1058" text-anchor="middle" class="boxTitle">NovaBench 科研评测</text>
+    <text x="965" y="1084" text-anchor="middle" class="boxText">金标任务 · 附件 · 引用 · 安全门禁</text>
+
+    <rect x="1155" y="1030" width="355" height="72" rx="16" fill="#E7F4F4" stroke="#0F8B8D" stroke-width="2"/>
+    <text x="1332.5" y="1058" text-anchor="middle" class="boxTitle">NovaEvolve 受治理自进化</text>
+    <text x="1332.5" y="1084" text-anchor="middle" class="boxText">观察 → 候选能力 → 评测 → 灰度 → 回滚</text>
+
+    <!-- Feedback loop -->
+    <path d="M1332 1030 C1515 980 1545 520 1490 430" class="dash"/>
+    <text x="1518" y="720" transform="rotate(-90 1518 720)" text-anchor="middle" class="tag">仅将评测通过的能力回灌生产</text>
+
+    <!-- Foundation label -->
+    <text x="800" y="1155" text-anchor="middle" class="small">
+      数据与基础设施：PostgreSQL · OpenSearch · Neo4j · MinIO/S3 · Redis · vLLM · Docker/Kubernetes · OpenTelemetry · Prometheus/Grafana
+    </text>
+  </g>
+</svg>
