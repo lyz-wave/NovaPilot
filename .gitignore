@@ -46,3 +46,6 @@ deliverables/NovaPilot_竞赛融合终版_交付包/NovaPilot_PRD_最终版/*.do
 
 # Historical drafts (archived locally, not needed on GitHub)
 03_历史方案与参考/
+
+# Hermes Agent workspace metadata
+.hermes/
