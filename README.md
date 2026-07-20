@@ -24,8 +24,6 @@ NovaPilot is an AI-powered intelligent service system for **scientific research 
   <img src="screenshots/novapilot-promo.webp" alt="NovaPilot promotional video demo" width="100%">
 </p>
 
-*15-second promo video — built with [HyperFrames](https://hyperframes.heygen.com) (HTML → MP4), Cobalt Grid design system.*
-
 ## Key Features
 
 | Module | Description |
