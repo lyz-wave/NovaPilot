@@ -1,0 +1,36 @@
+flowchart LR
+  subgraph NOW["现状 · 典型一单咨询"]
+    direction LR
+    N1["多渠道提问<br/>官网 / 销售 / 客服 / 邮件<br/><i>P1 碎片化</i>"] --> N2["客服 / 销售转述<br/><i>信息口头传递,转述失真</i>"]
+    N2 --> N3["专家排期回复<br/><i>P2 专家被重复问题占用<br/>P3 回答无证据绑定</i>"]
+    N3 --> N4["来回补充条件<br/>客户重复描述"]
+    N4 --> N5["结论无记录<br/><i>P4 经验随人走</i>"]
+    N5 --> N6["下次同样问题<br/>重新来一遍"]
+  end
+
+  subgraph NEW["NovaPilot 后 · 同一单"]
+    direction LR
+    M1["① 统一入口提问<br/>四角色工作台(中英日)"] --> M2["② 项目事实建档<br/>来源 / 置信度 / 确认状态"]
+    M2 --> M3["③ 只追问会改变方案的条件"]
+    M3 --> M4["④ 证据核验决策卡<br/>方案 / 预算 / 周期 / 风险 + 证据芯片<br/><i>Actor 起草 · Critic 核验 · NovaGuard 分级</i>"]
+    M4 --> M5{"风险分级"}
+    M5 -->|低风险 · 证据充分| M6["⑤ 正式决策卡<br/>客户直接可执行"]
+    M5 -->|高风险 · 证据不足| M7["转专家<br/>完整交接包:目标 / 事实 / 证据 / 待决策项"]
+    M6 --> M8["⑥ 专家复核与修订<br/><i>被排除证据不进入候选</i>"]
+    M7 --> M8
+    M8 --> M9["⑦ 沉淀为候选知识<br/><i>Owner 审核 · NovaBench · 人工批准 · 5% 灰度</i>"]
+    M9 --> M10["⑧ 知识回流咨询<br/>组织知识资产持续增长"]
+    M10 -.闭环:知识反哺.-> M1
+    M9 --> M11["运营监控<br/>指标退化 · 一键回滚"]
+  end
+
+  LOOP["五环节业务闭环:<br/>问题 → 方案 → 执行 → 验证 → 迭代"]
+
+  classDef nowNode fill:#eef0f3,stroke:#9aa4b2,color:#5d6c83,stroke-width:1px;
+  classDef newNode fill:#eaf7f4,stroke:#0e8a7c,color:#14524b,stroke-width:1.5px;
+  classDef gate fill:#fff6e5,stroke:#b97608,color:#8a5a00,stroke-width:1.5px;
+  classDef loop fill:#0f1420,stroke:#0f1420,color:#ffffff,stroke-width:1px;
+  class N1,N2,N3,N4,N5,N6 nowNode;
+  class M1,M2,M3,M4,M6,M7,M8,M9,M10,M11 newNode;
+  class M5 gate;
+  class LOOP loop;
