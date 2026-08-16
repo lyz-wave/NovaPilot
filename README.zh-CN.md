@@ -10,14 +10,21 @@ NovaPilot 是面向**科研客户技术支持与咨询**的 AI 智能服务体�
 - **受治理自进化**:专家修订成为候选知识,经 Owner 审核 + NovaBench 金标回归 + 人工批准 + 灰度
   四道门禁才进生产,支持一键回滚与全程审计。
 
-## 在线体验(点链接直接启动)
+## 体验与下载
 
-NovaPilot 依赖 Node 服务端(内置 `node:sqlite` 本地数据库),**无法部署到 GitHub Pages(纯静态托管)**:
+**三平台免安装体验包(v3.2.0)**:内置 Node 运行时 + 全部依赖 + 构建产物,下载解压、双击即用,**无需联网、无需安装任何东西**。
 
-- **Render 免费一键部署**(公开链接):
+| 平台 | 下载 | 启动方式 |
+| --- | --- | --- |
+| Windows x64 | [NovaPilot-portable-windows-x64.zip](https://github.com/lyz-wave/NovaPilot/releases/download/v3.2.0/NovaPilot-portable-windows-x64.zip) | 双击「启动.bat」 |
+| macOS (Apple Silicon) | [NovaPilot-portable-macos-arm64.zip](https://github.com/lyz-wave/NovaPilot/releases/download/v3.2.0/NovaPilot-portable-macos-arm64.zip) | 双击「启动.command」 |
+| Linux x64 | [NovaPilot-portable-linux-x64.zip](https://github.com/lyz-wave/NovaPilot/releases/download/v3.2.0/NovaPilot-portable-linux-x64.zip) | 运行 start.sh |
+
+启动后浏览器打开 http://localhost:3210,演示动线见 [评委快速上手](评委快速上手.md)。每次推送 `v*` 标签,GitHub Actions 自动重建三平台包并挂载 Release。
+
+- **源码包**:[v3.0.0 源码 zip](https://github.com/lyz-wave/NovaPilot/archive/refs/tags/v3.0.0.zip) — `npm install && npm run build && PORT=3210 npm start`
+- **在线部署**:NovaPilot 依赖 Node 服务端,无法用 GitHub Pages;可用 Render 免费一键部署(公开链接)或 Codespaces 一键启动,详见 [部署说明](部署说明.md):
   [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/lyz-wave/NovaPilot)
-  部署后获得 `https://novapilot.onrender.com`。免费实例空闲约 15 分钟休眠,访问时数十秒自动唤醒。
-- **GitHub Codespaces**:仓库页 Code → Codespaces 一键启动,自动安装构建,端口 3210 自动转发预览。
 
 ## 界面截图
 

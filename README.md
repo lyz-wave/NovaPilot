@@ -10,14 +10,21 @@ NovaPilot is an AI-powered service system for **scientific research customer sup
 - **Every recommendation is evidence-bound** — citations can only come from verified SOP/literature chunks, enforced by a rule-authority critic.
 - **Governed self-evolution** — expert amendments become candidates; only Owner review + NovaBench gold-set regression + human approval + gray release promote them to production, with one-click rollback and a full audit trail.
 
-## Online Demo (Deploy & Click)
+## 体验与下载 (Demo & Downloads)
 
-NovaPilot needs a Node server (built-in `node:sqlite` local database), so it **cannot run on GitHub Pages (static hosting only)**. Two one-click options, see [部署说明](部署说明.md):
+**三平台免安装体验包(v3.2.0)**:内置 Node 运行时 + 全部依赖 + 构建产物,下载解压、双击即用,**无需联网、无需安装任何东西**。
 
-- **Render free one-click deploy** (public link anyone can open):
+| 平台 | 下载 | 启动方式 |
+| --- | --- | --- |
+| Windows x64 | [NovaPilot-portable-windows-x64.zip](https://github.com/lyz-wave/NovaPilot/releases/download/v3.2.0/NovaPilot-portable-windows-x64.zip) | 双击「启动.bat」 |
+| macOS (Apple Silicon) | [NovaPilot-portable-macos-arm64.zip](https://github.com/lyz-wave/NovaPilot/releases/download/v3.2.0/NovaPilot-portable-macos-arm64.zip) | 双击「启动.command」 |
+| Linux x64 | [NovaPilot-portable-linux-x64.zip](https://github.com/lyz-wave/NovaPilot/releases/download/v3.2.0/NovaPilot-portable-linux-x64.zip) | 运行 start.sh |
+
+启动后浏览器打开 http://localhost:3210,演示动线见 [评委快速上手](评委快速上手.md)。每次推送 `v*` 标签,GitHub Actions 会自动重建三平台包并挂载到 Release。
+
+- **源码包**:[v3.0.0 源码 zip](https://github.com/lyz-wave/NovaPilot/archive/refs/tags/v3.0.0.zip) — `npm install && npm run build && PORT=3210 npm start`
+- **在线部署**:NovaPilot 依赖 Node 服务端(内置 `node:sqlite`),无法用 GitHub Pages;可用 Render 免费一键部署(公开链接)或 GitHub Codespaces 一键启动,详见 [部署说明](部署说明.md):
   [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/lyz-wave/NovaPilot)
-  You get `https://novapilot.onrender.com` after deployment. Free instances sleep after ~15 min idle and wake in tens of seconds; data resets to the seeded demo state (the app self-seeds).
-- **GitHub Codespaces**: repo page → Code → Codespaces → Create codespace. The devcontainer auto-installs, builds and starts the app, forwarding port 3210 with a preview.
 
 ## Screenshots
 
