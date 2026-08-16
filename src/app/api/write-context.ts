@@ -28,7 +28,7 @@ export function requireWriteContext(
       ),
     };
   }
-  if (tenantId !== "novogene-demo" || !/^"v\d+"$/.test(expectedVersion)) {
+  if (tenantId !== "novapilot-demo" || !/^"v\d+"$/.test(expectedVersion)) {
     return {
       error: NextResponse.json({ error: "INVALID_WRITE_CONTEXT" }, { status: 403 }),
     };

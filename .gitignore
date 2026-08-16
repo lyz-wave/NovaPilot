@@ -1,4 +1,5 @@
 # Dependencies
+node_modules
 node_modules/
 
 # Next.js build
@@ -49,3 +50,6 @@ deliverables/NovaPilot_竞赛融合终版_交付包/NovaPilot_PRD_最终版/*.do
 
 # Hermes Agent workspace metadata
 .hermes/
+
+# NovaPilot local database
+.data/

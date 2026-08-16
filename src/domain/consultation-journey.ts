@@ -4,7 +4,28 @@ export type Scenario =
   | "missing-dv200"
   | "evidence-conflict"
   | "non-standard"
-  | "manual-escalation";
+  | "manual-escalation"
+  | "analysis-method"
+  | "paper-support"
+  | "platform-selection";
+
+/**
+ * 客户角色(命题要求 1:面向 PI/博士后/研究生/企业研发的差异化体验)。
+ * 客户端 UI 关注点,服务端不感知;四角色共享同一项目事实、证据链与决策版本。
+ */
+export type ClientRole = "pi" | "postdoc" | "student" | "rnd";
+
+export const CLIENT_ROLES: Array<{
+  id: ClientRole;
+  label: string;
+  short: string;
+  note: string;
+}> = [
+  { id: "pi", label: "实验室 PI", short: "PI", note: "决策摘要与风险优先 · 方案对比与决策记录" },
+  { id: "postdoc", label: "博士后", short: "博后", note: "参数编辑与文献对比 · 可复现版本记录" },
+  { id: "student", label: "研究生", short: "研究生", note: "三步引导与术语解释 · 学习模式" },
+  { id: "rnd", label: "企业研发", short: "企业", note: "批次 SLA 与合规审计 · 数据边界优先" },
+];
 export type CardStatus =
   | "draft"
   | "needs-conditions"
@@ -18,6 +39,10 @@ export interface ProjectFacts {
   dv200?: number;
   rnaInputNg?: number;
   material?: string;
+  /** 物种(如 Homo sapiens / Mus musculus):进入问句拼装与项目记忆。 */
+  species?: string;
+  /** 研究目标(如 差异表达 · 通路富集 / 肿瘤微环境与免疫):进入问句拼装。 */
+  goal?: string;
 }
 
 export interface ProjectFactRecord {
@@ -67,6 +92,12 @@ export interface DecisionCard {
   budgetRange: string | null;
   timelineRange: string | null;
   pendingItems: string[];
+  /**
+   * Non-blocking, hypothesis-driven next-step confirmations derived from the
+   * recommended route's applicability boundary (e.g. species, per-sample QC).
+   * Unlike `pendingItems` these never block the conclusion — they refine it.
+   */
+  advisoryConfirmations?: string[];
   expertStatus: "not-required" | "awaiting-claim" | "claimed" | "approved";
   executiveSummary: string;
   recommendations: Recommendation[];
@@ -102,7 +133,15 @@ export interface ExpertCase {
     reason: string;
     evidenceConflict: boolean;
     decisionsNeeded: string[];
+    /** AI 已检索证据链:专家批准前逐条复核(交接包完整性,大纲 4.7)。 */
+    evidence?: Evidence[];
   };
+  /** 认领时间(ISO):驱动 SLA 剩余倒计时;退回队列时清除。 */
+  claimedAt?: string;
+  /** Set when a claimed case is returned to the queue for more conditions. */
+  returnNote?: string;
+  /** The expert's final amendment text when the case is resolved. */
+  resolution?: string;
 }
 
 export interface ConsultationInput {
@@ -127,6 +166,67 @@ export interface ConsultationResult {
   traceId: string;
 }
 
+/**
+ * One persisted turn of the ongoing conversation. A turn is either plain chat
+ * text (greetings, capability questions) or a full research decision card. Both
+ * the server (persistence) and the client (history rendering) share this shape.
+ */
+export interface ConversationTurn {
+  id: string;
+  role: "user" | "assistant";
+  kind: "chat" | "card";
+  /** User question, or an assistant chat reply. Null for card turns. */
+  text: string | null;
+  /** Full consultation result for an assistant card turn. Null otherwise. */
+  result: ConsultationResult | null;
+  /** 客户端附加的编排思考过程(检查点节点 id)。服务端不写入,历史回合加载时为 undefined。 */
+  checkpoints?: string[];
+  /** 客户端标注:quick = 快捷场景/模板注入(带“快捷提问”徽标);typed = 用户手输。 */
+  source?: "typed" | "quick";
+  createdAt: string;
+}
+
+/**
+ * Lightweight metadata for one conversation thread in the multi-conversation
+ * history list (the sidebar switcher). Shared by the server (persistence) and
+ * the client (rendering) — defined here so the client never imports server code.
+ */
+export interface ConversationMeta {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messageCount: number;
+  lastMessageAt: string | null;
+}
+
+/**
+ * Context-window usage for a conversation — drives the CC-style context ring.
+ * `contextTokens / contextWindow = ratio`. Computed server-side but shared with
+ * the client for rendering.
+ */
+export interface ContextUsage {
+  contextTokens: number;
+  contextWindow: number;
+  ratio: number;
+  provider: string;
+  model: string;
+  compacted: boolean;
+}
+
+/**
+ * A persisted decision-card revision — one row of the real version history the
+ * decision-card panel renders (backed by the `decision_cards` table, keyed by
+ * `(id, version)`).
+ */
+export interface CardVersionMeta {
+  version: number;
+  status: string;
+  title: string;
+  traceId: string;
+  createdAt: string;
+}
+
 const copy = {
   zh: {
     project: "FFPE RNA 表达谱项目",
@@ -137,13 +237,13 @@ const copy = {
     primaryReason: "兼顾降解样本的信息保留、差异表达稳健性与后续可解释性。",
     alternative: "备选｜低输入 RNA 捕获方案（适用于质控波动样本）",
     depthTitle: "PE150 · 50M reads/样本",
-    depthReason: "满足基因与转录本层级定量，并保留后续可复核空间。",
+    depthReason: "满足基因与转录本层级定量(官方口径:单样本 6–12 Gb,Q30 ≥ 85%),并保留后续可复核空间。",
     depthBoundary: "不包含融合基因发现或超低频事件检测。",
-    serviceTitle: "诺禾 FFPE RNA 一体化服务",
-    serviceReason: "质控、建库、测序与下游分析可共享同一项目事实和证据链。",
+    serviceTitle: "医学转录组测序 · NovaPilot 一体化服务",
+    serviceReason: "对齐官方医学转录组口径(0.4 μg 起始、Illumina PE150、Q30 ≥ 85%),质控、建库、测序与下游分析共享同一项目事实和证据链。",
     serviceLimit: "最终报价、排期和样本接收以人工确认及客户授权为准。",
     budget: "¥35,000–55,000 · 以授权报价为准",
-    timeline: "6–8 周 · 样本验收后确认",
+    timeline: "18 天(≤30 样本) · 样本验收后确认",
     question: "请补充样本的 DV200 检测结果。",
     questionReason: "DV200 会改变建库路线、最低投入量和失败风险。",
     inputQuestion: "请补充可用于建库的 RNA 投入量（ng）。",
@@ -165,13 +265,13 @@ const copy = {
       "Balances information retention, robust differential expression and interpretability for degraded samples.",
     alternative: "Alternative | Low-input RNA capture for variable-quality samples",
     depthTitle: "PE150 · 50M reads/sample",
-    depthReason: "Supports gene- and transcript-level quantification with room for later review.",
+    depthReason: "Supports gene- and transcript-level quantification (official spec: 6–12 Gb per sample, Q30 ≥ 85%) with room for later review.",
     depthBoundary: "Does not include fusion discovery or ultra-low-frequency event detection.",
-    serviceTitle: "Novogene integrated FFPE RNA service",
-    serviceReason: "QC, library preparation, sequencing and analysis share one verified project state and evidence chain.",
+    serviceTitle: "Medical transcriptome sequencing · NovaPilot integrated service",
+    serviceReason: "Aligned with the official medical-transcriptome spec (0.4 μg input, Illumina PE150, Q30 ≥ 85%); QC, library prep, sequencing and analysis share one evidence chain.",
     serviceLimit: "Final price, schedule and sample acceptance require human confirmation and customer consent.",
     budget: "CNY 35,000–55,000 · quote requires consent",
-    timeline: "6–8 weeks · confirmed after sample acceptance",
+    timeline: "18 days (≤30 samples) · confirmed after sample acceptance",
     question: "Please provide the sample DV200 measurement.",
     questionReason: "DV200 changes the library route, minimum input and failure risk.",
     inputQuestion: "Please provide the RNA input available for library preparation (ng).",
@@ -195,13 +295,13 @@ const copy = {
       "分解試料の情報保持、差次的発現解析の安定性、解釈性を両立します。",
     alternative: "代替案｜品質変動試料向け低入力 RNA キャプチャ",
     depthTitle: "PE150 · 50M reads/試料",
-    depthReason: "遺伝子・転写産物レベルの定量と、後続レビューの余地を確保します。",
+    depthReason: "遺伝子・転写産物レベルの定量を確保します(公式仕様:検体あたり 6–12 Gb、Q30 ≥ 85%)。",
     depthBoundary: "融合遺伝子探索および超低頻度イベント検出は含みません。",
-    serviceTitle: "Novogene FFPE RNA 統合サービス",
-    serviceReason: "QC、ライブラリ調製、シーケンス、解析が同じ確認済みプロジェクト状態と証拠を共有します。",
+    serviceTitle: "メディカルトランスクリプトーム · NovaPilot 統合サービス",
+    serviceReason: "公式メディカルトランスクリプトーム仕様(0.4 μg 起始、Illumina PE150、Q30 ≥ 85%)に整合し、QC・ライブラリ調製・シーケンス・解析が同じ証拠を共有します。",
     serviceLimit: "最終価格、日程、試料受入は担当者確認と顧客同意が必要です。",
     budget: "35,000–55,000 元 · 見積には同意が必要",
-    timeline: "6–8 週間 · 試料受入後に確定",
+    timeline: "18 日(30 検体以下) · 試料受入後に確定",
     question: "試料の DV200 測定値を入力してください。",
     questionReason: "DV200 はライブラリ方式、最低投入量、失敗リスクを左右します。",
     inputQuestion: "ライブラリ調製に使用できる RNA 投入量（ng）を入力してください。",
@@ -248,8 +348,47 @@ const verifiedEvidence: Evidence[] = [
     validUntil: "2027-12-31",
     validation: "verified",
   },
+  {
+    id: "E-SOP-MED-001",
+    source: "SOP",
+    title: "医学转录组服务规格(官方口径)",
+    citation: "NV-SOP-MED-001",
+    version: "v1.0",
+    appliesTo: "人和小鼠 mRNA; Illumina; FFPE RNA",
+    validUntil: "2027-12-31",
+    validation: "verified",
+  },
 ];
 
+/**
+ * 场景问题模板工厂:用当前项目事实拼装问题,注入的快捷提问与用户所见参数一致。
+ * 注意:发送时后端以“已确认事实”为准;此处展示编辑中的事实值,便于用户核对修改。
+ */
+export function buildScenarioPrompt(scenario: Scenario, facts: ProjectFacts): string {
+  const mat = facts.material ?? "FFPE RNA";
+  const n = facts.sampleCount != null ? `${facts.sampleCount} 份` : "若干";
+  const dv = facts.dv200 != null ? `DV200 ${facts.dv200}%` : "DV200 待确认";
+  const sp = facts.species ? `物种 ${facts.species}` : "";
+  const goal = facts.goal ?? "差异表达";
+  switch (scenario) {
+    case "standard":
+      return `基于已确认项目事实(${mat}、${n}、${dv}${sp ? `、${sp}` : ""}),请比较 FFPE RNA 建库路线和测序平台,给出推荐读长与数据量。`;
+    case "platform-selection":
+      return `针对这批 ${mat}(${n}、${dv}${sp ? `、${sp}` : ""})的${goal}研究,推荐哪种测序平台、读长与数据量?`;
+    case "analysis-method":
+      return `针对这批 ${mat}(${n}、${dv}${sp ? `、${sp}` : ""})的${goal}研究,推荐哪些数据分析方法与软件(如 DESeq2、edgeR、GO/KEGG 富集)?`;
+    case "paper-support":
+      return `这批 ${mat}(${n}、${dv}${sp ? `、${sp}` : ""})的${goal}结果如何解读?论文方法学、火山图与热图、统计量标注有哪些规范?`;
+    case "missing-dv200":
+      return "我不知道 DV200,请提供条件性路径。";
+    case "evidence-conflict":
+      return `请核对当前 SOP 与外部文献是否冲突(${mat}、${n})。`;
+    case "non-standard":
+      return "这是非标准特殊样本,请评估风险。";
+    case "manual-escalation":
+      return "请转交人工专家复核。";
+  }
+}
 export function inferScenarioFromQuestion(
   question: string,
   facts: ProjectFacts,
@@ -262,6 +401,15 @@ export function inferScenarioFromQuestion(
   }
   if (/不知道|缺少|没有.*dv200|don'?t know|unknown|missing|わから|不明/i.test(question)) {
     return "missing-dv200";
+  }
+  if (/数据分析|分析方法|分析软件|富集|DESeq|edgeR|RUVSeq|统计方法|data analysis/i.test(question)) {
+    return "analysis-method";
+  }
+  if (/平台选择|推荐.{0,8}测序平台|哪种平台|什么平台|NovaSeq/i.test(question)) {
+    return "platform-selection";
+  }
+  if (/论文|写作|发表|结果解读|图表|方法学|期刊|manuscript|publication|figure/i.test(question)) {
+    return "paper-support";
   }
   if (/非标准|特殊样本|non[- ]standard|特殊試料/i.test(question)) {
     return "non-standard";
@@ -276,7 +424,7 @@ export function inferScenarioFromQuestion(
   return "standard";
 }
 
-function buildRisk(scenario: Scenario, facts: ProjectFacts): RiskAssessment {
+export function buildRisk(scenario: Scenario, facts: ProjectFacts): RiskAssessment {
   if (scenario === "evidence-conflict") {
     return {
       level: "high",
@@ -635,7 +783,13 @@ export interface CandidateKnowledge {
   status: "candidate" | "owner-approved" | "gray-active" | "rejected";
   productionEligible: boolean;
   auditTrail: Array<{
-    stage: "candidate-created" | "owner-approved" | "novabench-passed" | "human-approved" | "gray-activated";
+    stage:
+      | "candidate-created"
+      | "owner-approved"
+      | "novabench-passed"
+      | "human-approved"
+      | "gray-activated"
+      | "rolled-back";
     actor: string;
   }>;
   rollbackVersion: string | null;
@@ -645,9 +799,11 @@ export function createCandidateKnowledge(input: {
   sourceCaseId: string;
   expertModification: string;
   evidenceIds: string[];
+  /** 可选自定义候选 id;缺省保持演示用的固定 id(兼容既有断言)。 */
+  id?: string;
 }): CandidateKnowledge {
   return {
-    id: "CK-260719-017",
+    id: input.id ?? "CK-260719-017",
     sourceCaseId: input.sourceCaseId,
     statement: input.expertModification,
     evidenceIds: input.evidenceIds,
@@ -663,6 +819,25 @@ export function createCandidateKnowledge(input: {
   };
 }
 
+/**
+ * 向审计轨迹追加一条阶段记录。
+ * 去重范围 = 最近一次 rolled-back 之后的当前周期:回滚后重新晋级视为
+ * 新一轮周期,同一阶段在新周期内允许再次记录(旧周期记录保留在历史中)。
+ */
+function appendStage(
+  trail: CandidateKnowledge["auditTrail"],
+  stage: CandidateKnowledge["auditTrail"][number]["stage"],
+  actor: string,
+): CandidateKnowledge["auditTrail"] {
+  let lastRollback = -1;
+  for (let i = 0; i < trail.length; i++) {
+    if (trail[i].stage === "rolled-back") lastRollback = i;
+  }
+  const cycle = trail.slice(lastRollback + 1);
+  if (cycle.some((entry) => entry.stage === stage)) return trail;
+  return [...trail, { stage, actor }];
+}
+
 export function promoteCandidateKnowledge(
   candidate: CandidateKnowledge,
   checks: {
@@ -672,29 +847,48 @@ export function promoteCandidateKnowledge(
     humanApproved: boolean;
   },
 ): CandidateKnowledge {
-  if (!checks.ownerApproved) return { ...candidate, status: "candidate", productionEligible: false };
+  // 逐门记录:每道已通过的门禁立即写入审计轨迹(而非只在全通过时整体
+  // 追加),这样刷新页面或切换候选后,已通过的中间门禁状态可以复原。
+  let trail = candidate.auditTrail;
+  if (checks.ownerApproved) trail = appendStage(trail, "owner-approved", candidate.owner);
+  if (checks.novaBenchPassed) trail = appendStage(trail, "novabench-passed", "novabench");
+  if (checks.humanApproved) trail = appendStage(trail, "human-approved", "release-manager");
+  if (checks.grayValidationPassed && checks.humanApproved) {
+    trail = appendStage(trail, "gray-activated", "release-manager");
+  }
+
+  if (!checks.ownerApproved) {
+    return { ...candidate, status: "candidate", productionEligible: false, auditTrail: trail };
+  }
   if (!checks.novaBenchPassed || !checks.grayValidationPassed || !checks.humanApproved) {
     return {
       ...candidate,
       status: "owner-approved",
       productionEligible: false,
-      auditTrail: [
-        ...candidate.auditTrail,
-        { stage: "owner-approved", actor: candidate.owner },
-      ],
+      auditTrail: trail,
     };
   }
   return {
     ...candidate,
     status: "gray-active",
     productionEligible: true,
-    auditTrail: [
-      { stage: "owner-approved", actor: candidate.owner },
-      { stage: "novabench-passed", actor: "novabench" },
-      { stage: "human-approved", actor: "release-manager" },
-      { stage: "gray-activated", actor: "release-manager" },
-    ],
+    auditTrail: trail,
     rollbackVersion: "KV-2026.07.18",
+  };
+}
+
+/**
+ * 一键回滚:灰度知识立即退出生产。
+ * 状态退回 owner-approved(已通过 Owner 审核但不再具备生产资格),
+ * 审计轨迹追加 rolled-back,回滚目标版本写入 rollbackVersion。
+ */
+export function rollbackCandidateKnowledge(candidate: CandidateKnowledge): CandidateKnowledge {
+  if (candidate.status !== "gray-active" || !candidate.productionEligible) return candidate;
+  return {
+    ...candidate,
+    status: "owner-approved",
+    productionEligible: false,
+    auditTrail: appendStage(candidate.auditTrail, "rolled-back", "release-manager"),
   };
 }
 

@@ -6,6 +6,7 @@ import {
   inferScenarioFromQuestion,
   promoteCandidateKnowledge,
   recordConsent,
+  rollbackCandidateKnowledge,
   recordFeedback,
   runConsultationJourney,
 } from "./consultation-journey";
@@ -247,8 +248,40 @@ describe("一次完整科研咨询旅程", () => {
     });
     expect(promoted.status).toBe("gray-active");
     expect(promoted.productionEligible).toBe(true);
-    expect(promoted.auditTrail).toHaveLength(4);
+    // 审计轨迹从 candidate-created 起点完整追加,而不是整体替换。
+    expect(promoted.auditTrail.map((entry) => entry.stage)).toEqual([
+      "candidate-created",
+      "owner-approved",
+      "novabench-passed",
+      "human-approved",
+      "gray-activated",
+    ]);
     expect(promoted.rollbackVersion).toBe("KV-2026.07.18");
+  });
+
+  it("灰度知识可一键回滚:退出生产、保留审计链、非灰态不生效", () => {
+    const candidate = createCandidateKnowledge({
+      sourceCaseId: "CASE-2407",
+      expertModification: "DV200 30–40% 时先进行两份代表样本试建库。",
+      evidenceIds: ["E-SOP-042"],
+    });
+    const promoted = promoteCandidateKnowledge(candidate, {
+      ownerApproved: true,
+      novaBenchPassed: true,
+      grayValidationPassed: true,
+      humanApproved: true,
+    });
+
+    const rolledBack = rollbackCandidateKnowledge(promoted);
+    expect(rolledBack.status).toBe("owner-approved");
+    expect(rolledBack.productionEligible).toBe(false);
+    expect(rolledBack.auditTrail.at(-1)).toEqual({ stage: "rolled-back", actor: "release-manager" });
+    expect(rolledBack.auditTrail).toHaveLength(6);
+
+    // 非灰度状态回滚是空操作,不追加审计。
+    const again = rollbackCandidateKnowledge(rolledBack);
+    expect(again.auditTrail).toHaveLength(6);
+    expect(again).toEqual(rolledBack);
   });
 
   it("科研决策卡包含决策所需的完整项目状态", () => {
