@@ -34,6 +34,7 @@ import {
   saveExpertCase,
 } from "../db/repositories";
 import { chunkCount, search, seedKnowledgeBase, type RetrievedChunk } from "../rag/retrieval";
+import { syncDecisionCard } from "../feishu/bitable";
 import {
   searchSimilarCases,
   recordCaseMemory,
@@ -382,6 +383,8 @@ export async function runConsultationGraph(
         : null,
   };
   saveDecisionCard(db, input.projectId, card, input.traceId, input.now);
+  // 飞书多维表格双写(凭证缺失时 no-op,不阻塞主流程)。
+  void syncDecisionCard(card).catch(() => {});
 
   let expertCase: GraphResult["expertCase"] = null;
   if (mustEscalate) {

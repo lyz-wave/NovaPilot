@@ -8,6 +8,7 @@ import {
   resolveQualityEvent,
   saveQualityEvent,
 } from "@/server/db/repositories";
+import { syncQualityEvent } from "@/server/feishu/bitable";
 
 // Node runtime required for node:sqlite (not available on the edge runtime).
 export const runtime = "nodejs";
@@ -72,6 +73,8 @@ export async function POST(request: Request) {
       resolvedAt: null,
     };
     saveQualityEvent(db, event);
+    // 飞书多维表格双写(凭证缺失时 no-op)。
+    void syncQualityEvent(event).catch(() => {});
     return NextResponse.json({ event }, { headers });
   }
 
@@ -80,5 +83,6 @@ export async function POST(request: Request) {
   if (!resolved) {
     return NextResponse.json({ error: "EVENT_NOT_FOUND" }, { status: 404 });
   }
+  void syncQualityEvent(resolved).catch(() => {});
   return NextResponse.json({ event: resolved }, { headers });
 }

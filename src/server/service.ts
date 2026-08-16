@@ -16,6 +16,7 @@ import {
   type StoredModelConfig,
 } from "./db/repositories";
 import { chunkCount, seedKnowledgeBase } from "./rag/retrieval";
+import { applyDoubaoEnvProfile } from "./feishu/doubao";
 import { estimateTokens } from "./rag/text";
 import {
   runConsultationGraph,
@@ -106,6 +107,8 @@ function buildHistory(db: NovaDb, conversationId: string): ChatMessage[] {
 /** Ensure the knowledge base is seeded (idempotent, cheap when already loaded). */
 export function ensureSeeded(db: NovaDb): void {
   if (chunkCount(db) === 0) seedKnowledgeBase(db);
+  // 企业豆包(火山方舟)环境变量自动注册模型 profile;缺 key 时 no-op。
+  applyDoubaoEnvProfile(db);
 }
 
 export interface ConsultInput {
