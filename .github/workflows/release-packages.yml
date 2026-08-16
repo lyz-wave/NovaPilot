@@ -89,9 +89,9 @@ jobs:
         run: |
           cd pkg/app
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            powershell -Command "Compress-Archive -Path '*' -DestinationPath '../NovaPilot-评委体验包-windows-x64.zip' -Force"
+            powershell -Command "Compress-Archive -Path '*' -DestinationPath '../NovaPilot-portable-windows-x64.zip' -Force"
           else
-            zip -r -q "../NovaPilot-评委体验包-${{ matrix.label }}.zip" .
+            zip -r -q "../NovaPilot-portable-${{ matrix.label }}.zip" .
           fi
           cd ..
           ls -la *.zip
@@ -100,5 +100,5 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           files: |
-            pkg/NovaPilot-评委体验包-*.zip
+            pkg/NovaPilot-portable-*.zip
           generate_release_notes: true
