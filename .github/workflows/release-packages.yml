@@ -48,7 +48,7 @@ jobs:
               mv /tmp/nodedir/*/* pkg/runtime/
               ;;
           esac
-          echo "runtime ready:"
+          echo "runtime ready"
           ls pkg/runtime | head -5
       - name: Assemble bundle
         shell: bash
@@ -69,24 +69,21 @@ jobs:
         shell: bash
         run: |
           cat > pkg/app/start.sh <<'EOF'
-#!/bin/sh
-cd "$(dirname "$0")"
-PORT=3210 ./runtime/bin/node node_modules/next/dist/bin/next start
-EOF
+          #!/bin/sh
+          cd "$(dirname "$0")"
+          PORT=3210 ./runtime/bin/node node_modules/next/dist/bin/next start
+          EOF
           cp pkg/app/start.sh pkg/app/启动.command
           chmod +x pkg/app/start.sh pkg/app/启动.command
           cat > pkg/app/启动.bat <<'EOF'
-@echo off
-chcp 65001 >nul
-cd /d %~dp0
-echo NovaPilot 启动中... 浏览器打开 http://localhost:3210
-set PORT=3210
-runtime
-ode.exe node_modules
-extdistin
-ext start
-pause
-EOF
+          @echo off
+          chcp 65001 >nul
+          cd /d %~dp0
+          echo NovaPilot 启动中... 浏览器打开 http://localhost:3210
+          set PORT=3210
+          runtime\node.exe node_modules\next\dist\bin\next start
+          pause
+          EOF
       - name: Archive package
         shell: bash
         run: |
