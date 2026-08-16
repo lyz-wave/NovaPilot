@@ -1,0 +1,14 @@
+# Render Blueprint:在 Render 用「New + Blueprint」选中仓库即可一键部署。
+# 免费方案:数据存 /tmp,实例休眠后唤醒会回到演示初始态(应用自举种子数据)。
+services:
+  - type: web
+    name: novapilot
+    runtime: docker
+    repo: https://github.com/lyz-wave/NovaPilot
+    plan: free
+    healthCheckPath: /
+    autoDeploy: true
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: NOVAPILOT_DB_PATH
+        value: /tmp/novapilot.db

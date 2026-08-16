@@ -6,6 +6,15 @@
 
 NovaPilot is an AI-powered intelligent service system for **scientific research customer support**. It transforms how research institutions handle multi-channel, multi-language, multi-expertise technical consulting — replacing fragmented manual workflows with a structured, evidence-driven decision engine.
 
+## Online Demo (Deploy & Click)
+
+NovaPilot 依赖 Node 服务端(内置 `node:sqlite` 本地数据库),**无法部署到 GitHub Pages(纯静态托管)**。推荐两种「点链接直接启动」方式,详见 [部署说明](部署说明.md):
+
+- **Render 免费一键部署**(公开链接,任何人可直接打开):
+  [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/lyz-wave/NovaPilot)
+  首次部署后在 Render Dashboard 获得 `https://novapilot.onrender.com` 链接;免费实例空闲约 15 分钟会休眠,点击链接后数十秒自动唤醒。
+- **GitHub Codespaces 一键启动**(需 GitHub 登录):仓库页 Code → Codespaces → Create codespace,自动安装依赖并启动服务,端口 3210 自动转发预览。
+
 ## Screenshots
 
 | Customer Consultation | Expert Workbench |

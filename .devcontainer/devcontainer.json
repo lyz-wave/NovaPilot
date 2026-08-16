@@ -1,0 +1,16 @@
+{
+  "name": "NovaPilot",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "containerEnv": {
+    "PORT": "3210"
+  },
+  "forwardPorts": [3210],
+  "portsAttributes": {
+    "3210": {
+      "label": "NovaPilot",
+      "onAutoForward": "openPreview"
+    }
+  },
+  "postCreateCommand": "npm install && npm run build",
+  "postAttachCommand": "npm start"
+}
