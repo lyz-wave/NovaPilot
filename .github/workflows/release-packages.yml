@@ -1,0 +1,107 @@
+name: release-packages
+
+# 推送 v* 标签时,在 Windows/macOS/Linux 三平台云端构建"免安装体验包"
+# (内置 Node 运行时 + 依赖 + 构建产物),自动创建 GitHub Release 并挂载。
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: linux-x64
+            node_archive: https://nodejs.org/dist/v22.14.0/node-v22.14.0-linux-x64.tar.xz
+          - os: macos-latest
+            label: macos-arm64
+            node_archive: https://nodejs.org/dist/v22.14.0/node-v22.14.0-darwin-arm64.tar.gz
+          - os: windows-latest
+            label: windows-x64
+            node_archive: https://nodejs.org/dist/v22.14.0/node-v22.14.0-win-x64.zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install & build
+        run: |
+          npm ci
+          npm run build
+      - name: Prepare portable Node runtime
+        shell: bash
+        run: |
+          mkdir -p pkg/runtime
+          curl -sL -o /tmp/node-dist "${{ matrix.node_archive }}"
+          case "${{ matrix.node_archive }}" in
+            *.tar.xz) tar -xJf /tmp/node-dist -C pkg/runtime --strip-components=1 ;;
+            *.tar.gz) tar -xzf /tmp/node-dist -C pkg/runtime --strip-components=1 ;;
+            *.zip)
+              unzip -q /tmp/node-dist -d /tmp/nodedir
+              mv /tmp/nodedir/*/* pkg/runtime/
+              ;;
+          esac
+          echo "runtime ready:"
+          ls pkg/runtime | head -5
+      - name: Assemble bundle
+        shell: bash
+        run: |
+          mkdir -p pkg/app
+          cp -R .next pkg/app/
+          cp -R node_modules pkg/app/
+          cp -R src pkg/app/
+          cp package.json package-lock.json next.config.ts tsconfig.json vitest.config.ts next-env.d.ts pkg/app/ 2>/dev/null || true
+          cp -R docs pkg/app/ 2>/dev/null || true
+          cp -R screenshots pkg/app/ 2>/dev/null || true
+          cp README.md README.zh-CN.md pkg/app/ 2>/dev/null || true
+          cp 参赛方案提交文档.md 前端优化说明.md NovaPilot-Agent架构说明.md 部署说明.md demo视频脚本.md 评委快速上手.md pkg/app/ 2>/dev/null || true
+          cp -R runtime pkg/app/runtime
+          rm -rf pkg/runtime
+          ls pkg/app | head -20
+      - name: Launcher scripts
+        shell: bash
+        run: |
+          cat > pkg/app/start.sh <<'EOF'
+#!/bin/sh
+cd "$(dirname "$0")"
+PORT=3210 ./runtime/bin/node node_modules/next/dist/bin/next start
+EOF
+          cp pkg/app/start.sh pkg/app/启动.command
+          chmod +x pkg/app/start.sh pkg/app/启动.command
+          cat > pkg/app/启动.bat <<'EOF'
+@echo off
+chcp 65001 >nul
+cd /d %~dp0
+echo NovaPilot 启动中... 浏览器打开 http://localhost:3210
+set PORT=3210
+runtime
+ode.exe node_modules
+extdistin
+ext start
+pause
+EOF
+      - name: Archive package
+        shell: bash
+        run: |
+          cd pkg/app
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            powershell -Command "Compress-Archive -Path '*' -DestinationPath '../NovaPilot-评委体验包-windows-x64.zip' -Force"
+          else
+            zip -r -q "../NovaPilot-评委体验包-${{ matrix.label }}.zip" .
+          fi
+          cd ..
+          ls -la *.zip
+      - name: Attach to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            pkg/NovaPilot-评委体验包-*.zip
+          generate_release_notes: true
