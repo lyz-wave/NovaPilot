@@ -345,7 +345,9 @@ export function ConsultationThread({
   function send() {
     const text = prompt.trim();
     if (!text || isPending) return;
-    const inferred = inferScenarioFromQuestion(text, latestCard?.project.facts ?? {});
+    // 场景推断必须以当前界面事实为准:否则新会话手输问题会误判为
+    // missing-dv200 并把用户刚填好的 DV200 抹掉(正式卡永远出不来)。
+    const inferred = inferScenarioFromQuestion(text, facts);
     onRun(inferred, text);
     setPrompt("");
     requestAnimationFrame(() => {
