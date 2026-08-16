@@ -1,6 +1,6 @@
 # NovaPilot — 可信科研客户服务智能体
 
-> **2026 AI 先锋未来大赛(飞书)** · [英文版](README.md) · [部署说明](部署说明.md) · [架构说明](NovaPilot-Agent架构说明.md) · [参赛方案提交文档](参赛方案提交文档.md) · [前端优化记录](前端优化说明.md)
+> **2026 AI 先锋未来大赛(飞书)** · [英文版](README.md) · [部署说明](docs/部署说明.md) · [架构说明](docs/架构说明.md) · [参赛方案提交文档](docs/参赛方案提交文档.md) · [前端优化记录](docs/前端优化说明.md)
 
 NovaPilot 是面向**科研客户技术支持与咨询**的 AI 智能服务体系:证据充分时安全解决问题、
 证据不足时准确追问、风险较高时携带完整上下文转交专家,并把每一次专家修订经治理后反哺知识库。
@@ -20,10 +20,10 @@ NovaPilot 是面向**科研客户技术支持与咨询**的 AI 智能服务体�
 | macOS (Apple Silicon) | [NovaPilot-portable-macos-arm64.zip](https://github.com/lyz-wave/NovaPilot/releases/download/v3.2.0/NovaPilot-portable-macos-arm64.zip) | 双击「启动.command」 |
 | Linux x64 | [NovaPilot-portable-linux-x64.zip](https://github.com/lyz-wave/NovaPilot/releases/download/v3.2.0/NovaPilot-portable-linux-x64.zip) | 运行 start.sh |
 
-启动后浏览器打开 http://localhost:3210,演示动线见 [评委快速上手](评委快速上手.md)。每次推送 `v*` 标签,GitHub Actions 自动重建三平台包并挂载 Release。
+启动后浏览器打开 http://localhost:3210,演示动线见 [评委快速上手](docs/评委快速上手.md)。每次推送 `v*` 标签,GitHub Actions 自动重建三平台包并挂载 Release。
 
 - **源码包**:[v3.0.0 源码 zip](https://github.com/lyz-wave/NovaPilot/archive/refs/tags/v3.0.0.zip) — `npm install && npm run build && PORT=3210 npm start`
-- **在线部署**:NovaPilot 依赖 Node 服务端,无法用 GitHub Pages;可用 Render 免费一键部署(公开链接)或 Codespaces 一键启动,详见 [部署说明](部署说明.md):
+- **在线部署**:NovaPilot 依赖 Node 服务端,无法用 GitHub Pages;可用 Render 免费一键部署(公开链接)或 Codespaces 一键启动,详见 [部署说明](docs/部署说明.md):
   [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/lyz-wave/NovaPilot)
 
 ## 界面截图
@@ -87,7 +87,7 @@ NovaPilot 是面向**科研客户技术支持与咨询**的 AI 智能服务体�
 ### E2E 验收脚本(本地,端口 3210)
 
     rm -rf .data                # 每个脚本前清库
-    node .knowledge-check.cjs   # 依此类推,共 14 个
+    node qa/knowledge-check-check.cjs   # 依此类推,共 14 个
 
 脚本清单:capability · streaming · align · composer · pin · role-lens · facts · card · collapse ·
 expert · knowledge · operations · click-audit · smoke,每个脚本输出 PASS/FAIL 汇总。
@@ -110,7 +110,7 @@ expert · knowledge · operations · click-audit · smoke,每个脚本输出 PAS
       adr/                     13 项架构决策记录
       feishu/                  飞书集成说明 + 妙搭配方
     deliverables/              竞赛文档(大纲、PDF、架构 SVG)
-    前端优化说明.md              前端优化记录(9.1–9.15)
+    docs/前端优化说明.md              前端优化记录(9.1–9.15)
 
 ## ADR 精选
 

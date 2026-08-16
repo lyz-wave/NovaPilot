@@ -2,7 +2,7 @@
 
 > **2026 AI Pioneer Future Competition (飞书2026AI先锋未来大赛)**
 >
-> [中文版](README.zh-CN.md) · [部署说明](部署说明.md) · [架构说明](NovaPilot-Agent架构说明.md) · [参赛方案提交文档](参赛方案提交文档.md) · [前端优化记录](前端优化说明.md)
+> [中文版](README.zh-CN.md) · [部署说明](docs/部署说明.md) · [架构说明](docs/架构说明.md) · [参赛方案提交文档](docs/参赛方案提交文档.md) · [前端优化记录](docs/前端优化说明.md)
 
 NovaPilot is an AI-powered service system for **scientific research customer support**. It replaces fragmented manual workflows with a structured, evidence-driven decision engine: the AI answers safely when evidence suffices, asks precisely when it doesn't, and hands off to experts with full context when risk is high — and every expert amendment feeds a **governed knowledge-evolution loop**.
 
@@ -20,10 +20,10 @@ NovaPilot is an AI-powered service system for **scientific research customer sup
 | macOS (Apple Silicon) | [NovaPilot-portable-macos-arm64.zip](https://github.com/lyz-wave/NovaPilot/releases/download/v3.2.0/NovaPilot-portable-macos-arm64.zip) | 双击「启动.command」 |
 | Linux x64 | [NovaPilot-portable-linux-x64.zip](https://github.com/lyz-wave/NovaPilot/releases/download/v3.2.0/NovaPilot-portable-linux-x64.zip) | 运行 start.sh |
 
-启动后浏览器打开 http://localhost:3210,演示动线见 [评委快速上手](评委快速上手.md)。每次推送 `v*` 标签,GitHub Actions 会自动重建三平台包并挂载到 Release。
+启动后浏览器打开 http://localhost:3210,演示动线见 [评委快速上手](docs/评委快速上手.md)。每次推送 `v*` 标签,GitHub Actions 会自动重建三平台包并挂载到 Release。
 
 - **源码包**:[v3.0.0 源码 zip](https://github.com/lyz-wave/NovaPilot/archive/refs/tags/v3.0.0.zip) — `npm install && npm run build && PORT=3210 npm start`
-- **在线部署**:NovaPilot 依赖 Node 服务端(内置 `node:sqlite`),无法用 GitHub Pages;可用 Render 免费一键部署(公开链接)或 GitHub Codespaces 一键启动,详见 [部署说明](部署说明.md):
+- **在线部署**:NovaPilot 依赖 Node 服务端(内置 `node:sqlite`),无法用 GitHub Pages;可用 Render 免费一键部署(公开链接)或 GitHub Codespaces 一键启动,详见 [部署说明](docs/部署说明.md):
   [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/lyz-wave/NovaPilot)
 
 ## Screenshots
@@ -93,7 +93,7 @@ Open in browser:
 ### E2E acceptance scripts (local, port 3210)
 
     rm -rf .data                       # fresh DB per script
-    node .knowledge-check.cjs          # and so on — 14 scripts total
+    node qa/knowledge-check-check.cjs          # and so on — 14 scripts total
 
 Scripts: capability · streaming · align · composer · pin · role-lens · facts · card · collapse · expert · knowledge · operations · click-audit · smoke. Each prints a PASS/FAIL summary.
 
@@ -115,7 +115,7 @@ Scripts: capability · streaming · align · composer · pin · role-lens · fac
       adr/                     13 Architecture Decision Records
       feishu/                  Feishu integration guide + Miaoda recipes
     deliverables/              Competition docs (outlines, PDFs, architecture SVGs)
-    前端优化说明.md              Frontend optimization changelog (9.1–9.15)
+    docs/前端优化说明.md              Frontend optimization changelog (9.1–9.15)
 
 ## ADR Highlights
 
