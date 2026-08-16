@@ -53,18 +53,6 @@ NovaPilot is an AI-powered service system for **scientific research customer sup
 | **🧠 Knowledge Evolution** | Expert amendments become candidates; Owner review → NovaBench gold-set regression → human approval → 5% gray release; multi-candidate switcher, per-gate audit trail, one-click rollback, bench slices that survive refresh |
 | **📊 Operations Dashboard** | Real NovaBench runs with persisted history and real trend sparklines; five-switch degradation matrix (per-gate fault injection); quality events with mandatory closing evidence; expandable 9-case gold-set drilldown; KPI target board |
 
-**Feishu five-in-one integration** (all optional, gracefully disabled without credentials):
-
-| Feishu capability | Role in NovaPilot |
-|---|---|
-| 企业豆包 (Enterprise Doubao) | LLM backend via Volcengine Ark (OpenAI-compatible); auto-registered from env |
-| aily 智能助手 | Consultation entry — decision cards returned as Feishu message cards |
-| 多维表格 (Bitable) | Auto-sync of decision cards & quality events (idempotent upsert) |
-| 妙搭 (Miaoda) | No-code dashboards — table schemas + view recipes provided |
-| 智能纪要 (Minutes) | Meeting transcript → project-fact extraction (DV200, sample count, species…) |
-
-Details: [docs/feishu/飞书五合一集成说明.md](docs/feishu/飞书五合一集成说明.md) · [docs/feishu/妙搭看板表结构.md](docs/feishu/妙搭看板表结构.md)
-
 ## Architecture Highlights
 
 - **Deterministic orchestration state machine** (LangGraph replacement) — every node writes a DB checkpoint; runs are inspectable and replayable.
@@ -122,7 +110,7 @@ Scripts: capability · streaming · align · composer · pin · role-lens · fac
         guards/                NovaGuard release gates
         eval/                  NovaBench gold set, governed promotion
         db/                    SQLite schema + repositories
-        feishu/                Feishu five-in-one integration (credential-gated)
+        feishu/                Feishu integration modules (credential-gated)
     docs/
       adr/                     13 Architecture Decision Records
       feishu/                  Feishu integration guide + Miaoda recipes

@@ -47,18 +47,6 @@ NovaPilot 是面向**科研客户技术支持与咨询**的 AI 智能服务体�
 | **🧠 知识进化** | 候选切换器;Owner → NovaBench → 人工批准 → 5% 灰度;逐门禁审计轨迹;一键回滚;候选影响面刷新不丢失 |
 | **📊 运营评测** | 真实 NovaBench 运行与历史趋势;五开关退化矩阵(逐门禁注入故障);质量事件(关闭证据必填);9 条金标明细;KPI 目标板 |
 
-**飞书五合一集成**(全部可选,凭证缺失时优雅禁用):
-
-| 飞书能力 | NovaPilot 落点 |
-|---|---|
-| 企业豆包 | 火山方舟作为 LLM 后端(OpenAI 兼容,env 自动注册激活) |
-| aily 智能助手 | 咨询入口,决策卡以消息卡片回传 |
-| 多维表格 | 决策卡/质量事件自动双写(幂等 upsert) |
-| 妙搭 | 无代码看板(交付表结构 + 视图配方) |
-| 智能纪要 | 会议纪要 → 项目事实抽取(DV200/样本数/物种…) |
-
-详见 [docs/feishu/飞书五合一集成说明.md](docs/feishu/飞书五合一集成说明.md) 与 [docs/feishu/妙搭看板表结构.md](docs/feishu/妙搭看板表结构.md)。
-
 ## 架构亮点
 
 - **确定性编排状态机**(LangGraph 替代):每节点落 DB checkpoint,可审计可重放。
@@ -117,7 +105,7 @@ expert · knowledge · operations · click-audit · smoke,每个脚本输出 PAS
         guards/                NovaGuard 发布门禁
         eval/                  NovaBench 金标集、受治理晋级
         db/                    SQLite schema 与仓储
-        feishu/                飞书五合一集成(凭证门控)
+        feishu/                飞书集成模块(凭证门控)
     docs/
       adr/                     13 项架构决策记录
       feishu/                  飞书集成说明 + 妙搭配方
