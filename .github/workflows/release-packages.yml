@@ -62,7 +62,7 @@ jobs:
           cp -R screenshots pkg/app/ 2>/dev/null || true
           cp README.md README.zh-CN.md pkg/app/ 2>/dev/null || true
           cp 参赛方案提交文档.md 前端优化说明.md NovaPilot-Agent架构说明.md 部署说明.md demo视频脚本.md 评委快速上手.md pkg/app/ 2>/dev/null || true
-          cp -R runtime pkg/app/runtime
+          cp -R pkg/runtime pkg/app/runtime
           rm -rf pkg/runtime
           ls pkg/app | head -20
       - name: Launcher scripts
