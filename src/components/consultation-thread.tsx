@@ -177,6 +177,7 @@ function CardBubble({
   checkpoints,
   lensLabel,
   lensText,
+  dv200,
 }: {
   result: ConsultationResult;
   onRun: (scenario: Scenario, prompt?: string) => void;
@@ -186,6 +187,8 @@ function CardBubble({
   checkpoints?: string[];
   lensLabel?: string;
   lensText?: string;
+  /** 当前(可编辑)项目事实里的 DV200,用于追问按钮文案跟随实际值。 */
+  dv200?: number;
 }) {
   return (
     <div className="message-body">
@@ -221,7 +224,9 @@ function CardBubble({
           <strong>{result.clarifyingQuestions[0].prompt}</strong>
           <p>{result.clarifyingQuestions[0].reason}</p>
           <div className="inline-actions">
-            <button onClick={() => onRun("standard")}>补充 DV200 = 62%</button>
+            <button onClick={() => onRun("standard")}>
+              {dv200 != null ? `补充 DV200 = ${dv200}%` : "补充 DV200"}
+            </button>
             <button
               className="ghost"
               onClick={() => onRun("missing-dv200", "我暂时不知道 DV200，请给出条件性路径与后续检测建议。")}
@@ -607,6 +612,7 @@ export function ConsultationThread({
                     checkpoints={turn.checkpoints}
                     lensLabel={showLens ? roleLabel : undefined}
                     lensText={showLens ? ROLE_LENS[role] : undefined}
+                    dv200={facts.dv200}
                   />
                 ) : (
                   <div className="message-body">

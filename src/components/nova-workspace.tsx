@@ -244,14 +244,20 @@ export function NovaWorkspace({
     return outcome;
   }
 
-  /** Run a streamed turn: append the user message, then the assistant reply. */
+  /**
+   * Run a streamed turn: append the user message, then the assistant reply.
+   * Resolves true once the turn completed successfully (even if the user has
+   * since switched away and the result isn't rendered), false on failure —
+   * callers that gate follow-up UI state (e.g. the rail's "asked" chips) on
+   * success rely on this.
+   */
   async function runStreamed(
     nextLocale: Locale,
     nextFacts: ProjectFacts,
     question: string,
     onSuccess?: () => void,
     quickLabel?: string,
-  ) {
+  ): Promise<boolean> {
     const streamConvId = activeConversationId;
     streamConvRef.current = streamConvId;
     // quickLabel 存在 ⇒ 快捷场景注入(带“快捷提问”徽标),否则为用户手输。
@@ -270,8 +276,8 @@ export function NovaWorkspace({
     progressRef.current = [];
     try {
       const outcome = await streamConsultation(question, nextLocale, nextFacts);
-      // 流返回时若已切走,结果仍持久化在原会话,但不写入当前视图。
-      if (streamConvRef.current !== streamConvId) return;
+      // 流返回时若已切走,结果仍持久化在原会话,但不写入当前视图(仍算成功)。
+      if (streamConvRef.current !== streamConvId) return true;
       const checkpoints = [...progressRef.current]; // 本轮完整的思考过程
       if (outcome.kind === "chat") {
         const turn = newTurn({ role: "assistant", kind: "chat", text: outcome.reply, result: null, checkpoints });
@@ -290,6 +296,7 @@ export function NovaWorkspace({
       if (autoCompact && outcome.contextUsage && outcome.contextUsage.ratio >= AUTO_COMPACT_THRESHOLD) {
         void compact();
       }
+      return true;
     } catch {
       setTurns((prev) => [
         ...prev,
@@ -300,6 +307,7 @@ export function NovaWorkspace({
           result: null,
         }),
       ]);
+      return false;
     } finally {
       setIsPending(false);
     }
@@ -329,9 +337,20 @@ export function NovaWorkspace({
     setLocale(nextLocale);
   }
 
-  /** 左侧“待客户确认”chips:点击即发送对应追问(带快捷提问徽标)。 */
-  function askFollowUp(question: string, label: string) {
-    run("standard", question, label);
+  /** 左侧“待客户确认”chips:点击即发送对应追问(带快捷提问徽标)。返回是否成功,
+   *  供 rail 只在成功时把 chip 标记为“已追问”。 */
+  async function askFollowUp(question: string, label: string): Promise<boolean> {
+    if (isPending) return false;
+    setScenario("standard");
+    const effectiveFacts = facts;
+    const needsConfirm = JSON.stringify(effectiveFacts) !== JSON.stringify(confirmedFacts);
+    return runStreamed(
+      locale,
+      effectiveFacts,
+      question,
+      needsConfirm ? () => setConfirmedFacts(effectiveFacts) : undefined,
+      label,
+    );
   }
 
   /** 某个回合的渐进渲染结束,清除流式标记(避免再次挂载时重播)。 */
