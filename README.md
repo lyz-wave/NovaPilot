@@ -12,6 +12,7 @@ NovaPilot is an AI-powered service system for **scientific research customer sup
 
 ## 体验与下载 (Demo & Downloads)
 
+
 **三平台免安装体验包(v3.2.0)**:内置 Node 运行时 + 全部依赖 + 构建产物,下载解压、双击即用,**无需联网、无需安装任何东西**。
 
 | 平台 | 下载 | 启动方式 |
