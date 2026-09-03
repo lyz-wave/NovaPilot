@@ -12,7 +12,7 @@ const feedbackSchema = z.object({
 export async function POST(request: Request) {
   const write = requireWriteContext(request);
   if (write.error) return write.error;
-  const parsed = feedbackSchema.safeParse(await request.json());
+  const parsed = feedbackSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) {
     return NextResponse.json({ error: "INVALID_FEEDBACK" }, { status: 400 });
   }

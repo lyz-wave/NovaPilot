@@ -289,7 +289,7 @@ export function KnowledgeEvolution({ initial, all, initialBench }: KnowledgeEvol
         <div>
           <span className="eyebrow">GOVERNED EVOLUTION / CANDIDATE {candidate.id}</span>
           <h1>让系统长知识，不让它偷偷改自己。</h1>
-          <p>专家经验先成为候选；只有 Owner、NovaBench 与灰度三道门全部通过，才获得生产资格。</p>
+          <p>专家经验先成为候选；只有 Owner、NovaBench、人工批准与 5% 灰度四道门全部通过，才获得生产资格。</p>
         </div>
         <div className="candidate-status">
           <Sparkles size={17} />

@@ -135,6 +135,10 @@ export function NovaWorkspace({
   const [streamingTurnId, setStreamingTurnId] = useState<string | null>(null);
   // 思考过程检查点的最新快照(闭包中的 progress 是旧值,这里用 ref 作为事实来源)。
   const progressRef = useRef<string[]>([]);
+  // 在飞的 SSE 请求:切换/新建/清空会话时必须真的中断它。只把 streamConvRef 置空
+  // 只能挡住最终结果,中途的 node 帧仍会继续写 progressRef 并刷新新会话的进度条;
+  // 用户随即在新会话提问时,两条流会争抢同一个 progressRef,检查点互相串台。
+  const abortRef = useRef<AbortController | null>(null);
   // 双栏可收起:左侧项目栏 / 右侧决策卡,收起后给咨询区留出空间。
   const [railCollapsed, setRailCollapsed] = useState(false);
   const [panelCollapsed, setPanelCollapsed] = useState(false);
@@ -202,6 +206,9 @@ export function NovaWorkspace({
     nextLocale: Locale,
     nextFacts: ProjectFacts,
   ): Promise<ResultFrame> {
+    const controller = new AbortController();
+    abortRef.current?.abort();
+    abortRef.current = controller;
     const response = await fetch("/api/consultations", {
       method: "POST",
       headers: WRITE_HEADERS(cardVersion, crypto.randomUUID()),
@@ -212,6 +219,7 @@ export function NovaWorkspace({
         stream: true,
         conversationId: activeConversationId,
       }),
+      signal: controller.signal,
     });
     if (!response.ok || !response.body) throw new Error(`请求失败：${response.status}`);
 
@@ -244,14 +252,20 @@ export function NovaWorkspace({
     return outcome;
   }
 
-  /** Run a streamed turn: append the user message, then the assistant reply. */
+  /**
+   * Run a streamed turn: append the user message, then the assistant reply.
+   * Resolves true once the turn completed successfully (even if the user has
+   * since switched away and the result isn't rendered), false on failure —
+   * callers that gate follow-up UI state (e.g. the rail's "asked" chips) on
+   * success rely on this.
+   */
   async function runStreamed(
     nextLocale: Locale,
     nextFacts: ProjectFacts,
     question: string,
     onSuccess?: () => void,
     quickLabel?: string,
-  ) {
+  ): Promise<boolean> {
     const streamConvId = activeConversationId;
     streamConvRef.current = streamConvId;
     // quickLabel 存在 ⇒ 快捷场景注入(带“快捷提问”徽标),否则为用户手输。
@@ -270,8 +284,8 @@ export function NovaWorkspace({
     progressRef.current = [];
     try {
       const outcome = await streamConsultation(question, nextLocale, nextFacts);
-      // 流返回时若已切走,结果仍持久化在原会话,但不写入当前视图。
-      if (streamConvRef.current !== streamConvId) return;
+      // 流返回时若已切走,结果仍持久化在原会话,但不写入当前视图(仍算成功)。
+      if (streamConvRef.current !== streamConvId) return true;
       const checkpoints = [...progressRef.current]; // 本轮完整的思考过程
       if (outcome.kind === "chat") {
         const turn = newTurn({ role: "assistant", kind: "chat", text: outcome.reply, result: null, checkpoints });
@@ -290,7 +304,10 @@ export function NovaWorkspace({
       if (autoCompact && outcome.contextUsage && outcome.contextUsage.ratio >= AUTO_COMPACT_THRESHOLD) {
         void compact();
       }
+      return true;
     } catch {
+      // 已切走(含主动中断)时不要把错误气泡塞进另一个会话的时间线。
+      if (streamConvRef.current !== streamConvId) return false;
       setTurns((prev) => [
         ...prev,
         newTurn({
@@ -300,8 +317,10 @@ export function NovaWorkspace({
           result: null,
         }),
       ]);
+      return false;
     } finally {
-      setIsPending(false);
+      // 只有本轮仍是最新一轮时才收起 pending:否则会误关掉后来那一轮的进行态。
+      if (streamConvRef.current === streamConvId) setIsPending(false);
     }
   }
 
@@ -329,9 +348,20 @@ export function NovaWorkspace({
     setLocale(nextLocale);
   }
 
-  /** 左侧“待客户确认”chips:点击即发送对应追问(带快捷提问徽标)。 */
-  function askFollowUp(question: string, label: string) {
-    run("standard", question, label);
+  /** 左侧“待客户确认”chips:点击即发送对应追问(带快捷提问徽标)。返回是否成功,
+   *  供 rail 只在成功时把 chip 标记为“已追问”。 */
+  async function askFollowUp(question: string, label: string): Promise<boolean> {
+    if (isPending) return false;
+    setScenario("standard");
+    const effectiveFacts = facts;
+    const needsConfirm = JSON.stringify(effectiveFacts) !== JSON.stringify(confirmedFacts);
+    return runStreamed(
+      locale,
+      effectiveFacts,
+      question,
+      needsConfirm ? () => setConfirmedFacts(effectiveFacts) : undefined,
+      label,
+    );
   }
 
   /** 某个回合的渐进渲染结束,清除流式标记(避免再次挂载时重播)。 */
@@ -350,11 +380,14 @@ export function NovaWorkspace({
     } catch {
       /* even if the request fails, clear the local view */
     }
+    abortRef.current?.abort();
     streamConvRef.current = null;
     setStreamingTurnId(null);
     setTurns([]);
     setLatestCard(null);
     setProgress([]);
+    progressRef.current = [];
+    setIsPending(false);
     void refreshConversations();
   }
 
@@ -372,20 +405,25 @@ export function NovaWorkspace({
     } catch {
       /* offline: still reset to a blank thread */
     }
+    abortRef.current?.abort();
     streamConvRef.current = null;
     setStreamingTurnId(null);
     setTurns([]);
     setLatestCard(null);
     setProgress([]);
+    progressRef.current = [];
+    setIsPending(false);
     setContextUsage(null);
   }
 
   async function switchConversation(id: string) {
     if (id === activeConversationId) return;
+    abortRef.current?.abort(); // 真正中断在飞的 SSE,而不只是丢弃它的结果
     streamConvRef.current = null; // 旧流结果不再写入任何视图
     setStreamingTurnId(null);
     setActiveConversationId(id);
     setProgress([]);
+    progressRef.current = [];
     setIsPending(false);
     try {
       const res = await fetch(`/api/conversation?conversationId=${encodeURIComponent(id)}`, {

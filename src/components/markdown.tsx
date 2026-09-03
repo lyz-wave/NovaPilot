@@ -125,6 +125,18 @@ function renderText(text: string, keyPrefix: string): ReactNode[] {
   });
 }
 
+/**
+ * 只允许安全协议的链接进入 href。返回 null 表示应降级为纯文本。
+ * 允许 http/https/mailto 以及站内相对路径(/、#、./、../)。
+ */
+function safeHref(raw: string): string | null {
+  const url = raw.trim();
+  if (!url) return null;
+  if (/^(?:\/|#|\.\/|\.\.\/)/.test(url)) return url; // 站内相对链接
+  if (/^(?:https?|mailto):/i.test(url)) return url;
+  return null;
+}
+
 function renderInline(segment: string, keyPrefix: string): ReactNode[] {
   const out: ReactNode[] = [];
   let last = 0;
@@ -152,10 +164,19 @@ function renderInline(segment: string, keyPrefix: string): ReactNode[] {
       out.push(<span className="md-math" key={key}>{math.slice(1, -1)}</span>);
     } else if (link) {
       const lm = link.match(/^\[([^\]]+)\]\(([^)]+)\)$/)!;
+      const href = safeHref(lm[2]!);
+      // 协议不在白名单内(javascript:/data: 等)时降级为纯文本:正文由模型生成,
+      // 注入的知识片段可以让它吐出可点击的 javascript: 链接。
       out.push(
-        <a className="md-link" href={lm[2]} key={key} rel="noreferrer" target="_blank">
-          {lm[1]}
-        </a>,
+        href ? (
+          <a className="md-link" href={href} key={key} rel="noreferrer" target="_blank">
+            {lm[1]}
+          </a>
+        ) : (
+          <span className="md-link-blocked" key={key} title={`已拦截不安全链接：${lm[2]}`}>
+            {lm[1]}
+          </span>
+        ),
       );
     } else if (cite) {
       out.push(<span className="md-cite" key={key}>{cite}</span>);

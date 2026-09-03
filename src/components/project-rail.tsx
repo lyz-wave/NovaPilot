@@ -8,6 +8,7 @@ import {
   CircleHelp,
   Database,
   FileText,
+  LoaderCircle,
   Orbit,
   Pencil,
   Plus,
@@ -22,8 +23,8 @@ interface ProjectRailProps {
   confirmed: boolean;
   onFactsChange: (facts: ProjectFacts) => void;
   onConfirm: () => void;
-  /** 点击“待客户确认”chips 时,发送对应追问。 */
-  onAsk?: (question: string, label: string) => void;
+  /** 点击“待客户确认”chips 时,发送对应追问;返回是否成功,只在成功时把 chip 标记为已追问。 */
+  onAsk?: (question: string, label: string) => Promise<boolean>;
   /** 侧栏收起状态与切换。 */
   collapsed: boolean;
   onToggleCollapse: () => void;
@@ -87,6 +88,7 @@ export function ProjectRail({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
   const [askedKeys, setAskedKeys] = useState<string[]>([]);
+  const [askingKeys, setAskingKeys] = useState<string[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const switcherWrapRef = useRef<HTMLDivElement>(null);
@@ -120,6 +122,13 @@ export function ProjectRail({
   const active =
     conversations.find((c) => c.id === activeConversationId) ?? conversations[0] ?? null;
 
+  // 新建/切换会话后,“已追问”chip 不应带着上一个会话的状态——那三条追问是针对
+  // 当前会话的事实澄清,新会话里从未真的问过。
+  useEffect(() => {
+    setAskedKeys([]);
+    setAskingKeys([]);
+  }, [activeConversationId]);
+
   function beginRename(c: ConversationMeta) {
     setRenamingId(c.id);
     setDraftTitle(c.title);
@@ -142,7 +151,6 @@ export function ProjectRail({
           aria-label="展开项目侧栏"
           title="展开项目侧栏"
           onClick={onToggleCollapse}
-          onMouseEnter={onToggleCollapse}
         >
           <span className="rail-logo-mark"><Orbit size={18} strokeWidth={1.7} aria-hidden="true" /></span>
         </button>
@@ -384,20 +392,32 @@ export function ProjectRail({
         </div>
         {PENDING_ASKS.map((ask) => {
           const asked = askedKeys.includes(ask.key);
+          const asking = askingKeys.includes(ask.key);
           return (
             <button
               key={ask.key}
               className={`pending-ask ${asked ? "asked" : ""}`}
-              disabled={asked}
+              disabled={asked || asking}
               title={ask.question}
-              onClick={() => {
-                setAskedKeys((prev) => [...prev, ask.key]);
-                onAsk?.(ask.question, ask.label);
+              onClick={async () => {
+                setAskingKeys((prev) => [...prev, ask.key]);
+                try {
+                  const ok = await onAsk?.(ask.question, ask.label);
+                  if (ok) setAskedKeys((prev) => [...prev, ask.key]);
+                } finally {
+                  setAskingKeys((prev) => prev.filter((k) => k !== ask.key));
+                }
               }}
             >
-              {asked ? <Check size={11} /> : <CircleHelp size={11} />}
+              {asked ? (
+                <Check size={11} />
+              ) : asking ? (
+                <LoaderCircle className="spin" size={11} />
+              ) : (
+                <CircleHelp size={11} />
+              )}
               {ask.label}
-              <small>{asked ? "已追问" : "待确认"}</small>
+              <small>{asked ? "已追问" : asking ? "提问中" : "待确认"}</small>
             </button>
           );
         })}

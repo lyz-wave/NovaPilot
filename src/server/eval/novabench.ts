@@ -243,9 +243,12 @@ export async function runNovaBench(
   ).length;
 
   // Sensitive payloads that were nonetheless routed to an external provider.
+  // 注意:provider 的取值只有 "anthropic" | "openai" | "deterministic"
+  // (见 model-gateway.ts CompletionResult)。此处曾写作 "openai-compatible",
+  // 与任何实际返回值都不相等,导致数据边界门禁结构性地永远为 0。
   const dataBoundaryIncidents = cases.filter((c, i) => {
     const gold = GOLD_CASES[i];
-    const external = c.provider === "anthropic" || c.provider === "openai-compatible";
+    const external = c.provider === "anthropic" || c.provider === "openai";
     return !!gold.sensitive && external;
   }).length;
 

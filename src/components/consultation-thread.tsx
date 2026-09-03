@@ -127,12 +127,13 @@ function ThinkingBlock({ checkpoints, done }: { checkpoints: string[]; done: boo
   if (done && checkpoints.length === 0) return null;
   return (
     <div className={`thinking-block ${done ? "thinking-done" : ""}`}>
+      {/* 折叠时思考过程区域不在 DOM 里,aria-controls 也必须跟着消失,否则指向不存在的 id。 */}
       <button
         type="button"
         className="thinking-toggle"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        aria-controls={trailId}
+        aria-controls={open ? trailId : undefined}
       >
         <span className="thinking-status">
           {done ? (
@@ -167,6 +168,30 @@ function ThinkingBlock({ checkpoints, done }: { checkpoints: string[]; done: boo
   );
 }
 
+/**
+ * 三个可追问字段的展示名、单位,以及“暂时不知道”时发送的降级提问。
+ * 追问项由领域层按缺失字段生成(dv200 / rnaInputNg / material),可同时出现多条,
+ * 所以按钮文案必须跟着字段走,不能一律写成 DV200。
+ */
+const CLARIFY_FIELD_COPY: Partial<
+  Record<keyof ProjectFacts, { label: string; unit?: string; unknownPrompt: string }>
+> = {
+  dv200: {
+    label: "DV200",
+    unit: "%",
+    unknownPrompt: "我暂时不知道 DV200，请给出条件性路径与后续检测建议。",
+  },
+  rnaInputNg: {
+    label: "RNA 投入量",
+    unit: " ng",
+    unknownPrompt: "我暂时不知道可用的 RNA 投入量，请给出条件性路径与后续检测建议。",
+  },
+  material: {
+    label: "样本材料",
+    unknownPrompt: "我暂时不知道样本材料与固定方式，请给出条件性路径与确认方式。",
+  },
+};
+
 /** Assistant bubble for a research decision-card turn. */
 function CardBubble({
   result,
@@ -177,6 +202,7 @@ function CardBubble({
   checkpoints,
   lensLabel,
   lensText,
+  facts,
 }: {
   result: ConsultationResult;
   onRun: (scenario: Scenario, prompt?: string) => void;
@@ -186,6 +212,8 @@ function CardBubble({
   checkpoints?: string[];
   lensLabel?: string;
   lensText?: string;
+  /** 当前(可编辑)项目事实:追问按钮的文案与可用性跟随实际填写的值。 */
+  facts?: ProjectFacts;
 }) {
   return (
     <div className="message-body">
@@ -217,18 +245,47 @@ function CardBubble({
 
       {result.clarifyingQuestions.length > 0 && (
         <div className="clarification-block">
-          <span className="block-kicker">最小必要追问 · 1 / 1</span>
-          <strong>{result.clarifyingQuestions[0].prompt}</strong>
-          <p>{result.clarifyingQuestions[0].reason}</p>
-          <div className="inline-actions">
-            <button onClick={() => onRun("standard")}>补充 DV200 = 62%</button>
-            <button
-              className="ghost"
-              onClick={() => onRun("missing-dv200", "我暂时不知道 DV200，请给出条件性路径与后续检测建议。")}
-            >
-              暂时不知道
-            </button>
-          </div>
+          <span className="block-kicker">
+            最小必要追问 · {result.clarifyingQuestions.length} 项
+          </span>
+          {result.clarifyingQuestions.map((question, index) => {
+            const copy = CLARIFY_FIELD_COPY[question.field];
+            // 左侧事实面板里已经填好的值:此时“补充”按钮能真的推进一步。
+            const filled = facts?.[question.field];
+            const hasValue = filled != null && filled !== "";
+            return (
+              <div className="clarification-item" key={question.field}>
+                <strong>
+                  {result.clarifyingQuestions.length > 1 && (
+                    <em className="clarify-seq">
+                      {index + 1} / {result.clarifyingQuestions.length}
+                    </em>
+                  )}
+                  {question.prompt}
+                </strong>
+                <p>{question.reason}</p>
+                <div className="inline-actions">
+                  {hasValue && (
+                    <button onClick={() => onRun("standard")}>
+                      补充 {copy?.label ?? question.field} = {filled}
+                      {copy?.unit ?? ""}
+                    </button>
+                  )}
+                  <button
+                    className="ghost"
+                    onClick={() =>
+                      onRun(
+                        question.field === "dv200" ? "missing-dv200" : "standard",
+                        copy?.unknownPrompt,
+                      )
+                    }
+                  >
+                    暂时不知道
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -451,7 +508,7 @@ export function ConsultationThread({
           type="button"
           className="role-collapse"
           aria-expanded={roleBarOpen}
-          aria-controls="role-panel-region"
+          aria-controls={roleBarOpen ? "role-panel-region" : undefined}
           aria-label={roleBarOpen ? "收起角色面板" : "展开角色面板"}
           onClick={() => setRoleBarOpen((v) => !v)}
         >
@@ -607,6 +664,7 @@ export function ConsultationThread({
                     checkpoints={turn.checkpoints}
                     lensLabel={showLens ? roleLabel : undefined}
                     lensText={showLens ? ROLE_LENS[role] : undefined}
+                    facts={facts}
                   />
                 ) : (
                   <div className="message-body">

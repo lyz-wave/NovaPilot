@@ -128,7 +128,10 @@ export function DecisionCardPanel({
   const [tab, setTab] = useState<Tab>("decision");
   const [consentState, setConsentState] = useState<"idle" | "done">("idle");
   const [feedbackDone, setFeedbackDone] = useState(false);
-  const [expertRequested, setExpertRequested] = useState(false);
+  // 两个入口共用一个 flag 时,在卡内点了「请求专家复核」会把 PI 角色动作区的
+  // 「预约专家复核」也置灰成“已预约”(反之亦然),看起来像已经约过但其实没有。
+  const [reviewRequested, setReviewRequested] = useState(false);
+  const [appointmentRequested, setAppointmentRequested] = useState(false);
   const [versions, setVersions] = useState<CardVersionMeta[]>([]);
   const [exported, setExported] = useState(false);
   const [glossaryOpen, setGlossaryOpen] = useState(false);
@@ -158,7 +161,8 @@ export function DecisionCardPanel({
     setExported(false);
     setConsentState("idle");
     setFeedbackDone(false);
-    setExpertRequested(false);
+    setReviewRequested(false);
+    setAppointmentRequested(false);
     setGlossaryOpen(false);
     // 角色视角:博士后默认落在“证据”标签页(文献对比优先)。
     setTab(role === "postdoc" ? "evidence" : "decision");
@@ -407,13 +411,13 @@ export function DecisionCardPanel({
                   {risk.level === "medium" && (
                     <button
                       className="text-button"
-                      disabled={expertRequested}
+                      disabled={reviewRequested}
                       onClick={async () => {
                         await onExpertRequest();
-                        setExpertRequested(true);
+                        setReviewRequested(true);
                       }}
                     >
-                      {expertRequested ? "已请求专家复核" : "请求专家复核"}
+                      {reviewRequested ? "已请求专家复核" : "请求专家复核"}
                     </button>
                   )}
                 </div>
@@ -548,13 +552,14 @@ export function DecisionCardPanel({
       {role === "pi" && (
         <div className="role-actions">
           <button
-            disabled={expertRequested}
+            disabled={appointmentRequested}
             onClick={async () => {
               await onExpertRequest();
-              setExpertRequested(true);
+              setAppointmentRequested(true);
             }}
           >
-            <Headset size={14} aria-hidden="true" /> {expertRequested ? "已预约专家复核" : "预约专家复核"}
+            <Headset size={14} aria-hidden="true" />{" "}
+            {appointmentRequested ? "已预约专家复核" : "预约专家复核"}
           </button>
         </div>
       )}

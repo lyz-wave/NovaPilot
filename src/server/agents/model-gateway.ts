@@ -97,6 +97,13 @@ export const MAX_OUTPUT_TOKENS = 131072;
  */
 const RETRY_MAX_TOKENS = 16384;
 
+/**
+ * 出站模型调用超时。没有它,一个只完成 TCP 握手却不回包的 baseUrl 会让
+ * /api/consultations 的 SSE 永久悬挂(start 帧之后再无任何输出),连接与
+ * DB 句柄一直被占用;超时后会自然回落到离线确定性生成器。
+ */
+const MODEL_TIMEOUT_MS = 120_000;
+
 function resolveConfig(cfg: ModelGatewayConfig = {}): Required<
   Pick<ModelGatewayConfig, "provider" | "model" | "miniModel">
 > & { apiKey?: string; baseUrl?: string; fallback?: ModelGatewayConfig["fallback"] } {
@@ -198,6 +205,7 @@ async function callAnthropic(
       max_tokens: req.maxTokens ?? MAX_OUTPUT_TOKENS,
       temperature: req.temperature ?? 0.2,
     }),
+    signal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`anthropic ${res.status}`);
   const data = (await res.json()) as {
@@ -235,6 +243,7 @@ async function callOpenAICompatible(
       max_tokens: req.maxTokens ?? MAX_OUTPUT_TOKENS,
       temperature: req.temperature ?? 0.2,
     }),
+    signal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`openai ${res.status}`);
   const data = (await res.json()) as {

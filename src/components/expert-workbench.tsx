@@ -17,7 +17,7 @@ import {
   RotateCcw,
   UserRoundCheck,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ExpertCase, ProjectFacts } from "@/domain/consultation-journey";
 
 /** One persisted expert case with its project + creation time (client-safe). */
@@ -87,6 +87,17 @@ export function ExpertWorkbench({ initialCases }: ExpertWorkbenchProps) {
   const [noticeLink, setNoticeLink] = useState(false);
 
   const active = cases.find((c) => c.expertCase.id === activeId) ?? cases[0] ?? null;
+
+  // 切换案例必须清空编辑态:修订文本、待决策项勾选(按数组下标存)与证据排除都是
+  // “这一个案例”的编辑结果。不清空时,在 A 案勾了第 1、2 项再切到 B 案批准,
+  // 提交的会是 A 案的修订文本 + B 案里同下标的待决策项,专家从未审过。
+  useEffect(() => {
+    setAmendment(DEFAULT_AMENDMENT);
+    setResolvedDecisions(new Set());
+    setExcludedEvidence(new Set());
+    setNotice(null);
+    setNoticeLink(false);
+  }, [activeId]);
   // 队列分组与排序(风险优先)
   const queueCases = useMemo(() => {
     const filtered = cases.filter((c) => {

@@ -7,11 +7,24 @@ export interface WriteContext {
   traceId: string;
 }
 
+const DEMO_BEARER = "Bearer demo-research-session";
+
+/**
+ * 仅校验调用方身份,不要求写上下文头(If-Match / 幂等键 / 租户)。
+ * 给飞书等集成入口用:它们有自己的租户,但同样不能匿名触发管线与落库。
+ */
+export function requireBearer(request: Request): NextResponse | null {
+  if (request.headers.get("authorization") !== DEMO_BEARER) {
+    return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
+  }
+  return null;
+}
+
 export function requireWriteContext(
   request: Request,
 ): { context: WriteContext; error?: never } | { context?: never; error: NextResponse } {
   const authorization = request.headers.get("authorization");
-  if (authorization !== "Bearer demo-research-session") {
+  if (authorization !== DEMO_BEARER) {
     return {
       error: NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 }),
     };

@@ -28,7 +28,7 @@ const requestSchema = z.object({
 export async function POST(request: Request) {
   const write = requireWriteContext(request);
   if (write.error) return write.error;
-  const parsed = requestSchema.safeParse(await request.json());
+  const parsed = requestSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) {
     return NextResponse.json(
       { error: "INVALID_CONSULTATION", details: parsed.error.flatten() },
@@ -112,7 +112,10 @@ function streamConsultation(input: {
         }
         send("done", { traceId: input.traceId });
       } catch (err) {
-        send("error", { message: (err as Error).message });
+        // 原始异常文本可能带上 SQLite 语句、文件路径或上游模型返回体,不下发给浏览器;
+        // traceId 已随 start 帧给出,足以在服务端日志里定位这一次失败。
+        console.error(`[consultations] trace=${input.traceId}`, err);
+        send("error", { message: "咨询处理失败，请稍后重试。", traceId: input.traceId });
       } finally {
         controller.close();
       }

@@ -7,6 +7,8 @@
  */
 const TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal";
 const OPEN_API_BASE = "https://open.feishu.cn/open-apis";
+/** 出站调用超时:上游挂住时若无超时,整个请求(及其占用的连接)会永久悬挂。 */
+const FEISHU_TIMEOUT_MS = 10_000;
 
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
@@ -28,6 +30,7 @@ export async function getTenantAccessToken(force = false): Promise<string | null
         app_id: process.env.FEISHU_APP_ID,
         app_secret: process.env.FEISHU_APP_SECRET,
       }),
+      signal: AbortSignal.timeout(FEISHU_TIMEOUT_MS),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as {
@@ -67,6 +70,7 @@ export async function feishuRequest<T = unknown>(
         method,
         headers: { authorization: "Bearer " + token, "content-type": "application/json" },
         body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(FEISHU_TIMEOUT_MS),
       });
       return (await res.json().catch(() => ({}))) as FeishuResponse<T>;
     } catch {

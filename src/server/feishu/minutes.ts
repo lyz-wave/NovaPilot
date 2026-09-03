@@ -14,16 +14,23 @@ interface TranscriptParagraph {
   elements?: Array<{ text_content?: { text?: string } }>;
 }
 
+/** 飞书 token 只含 URL 安全的字母数字与 -_,拒绝一切可能改变请求路径的输入。 */
+const MINUTE_TOKEN_RE = /^[A-Za-z0-9_-]{1,128}$/;
+
 /** Pull a minute's metadata + transcript and flatten it to plain text. */
 export async function fetchMinutes(minuteToken: string): Promise<MinutesContent | null> {
   if (!feishuEnabled()) return null;
+  // token 会拼进带 tenant access token 的请求路径:未校验时 "../../../im/v1/chats"
+  // 这类输入会被 fetch 规范化,越出 /minutes/ 命名空间打到任意飞书 GET 接口(SSRF)。
+  if (!MINUTE_TOKEN_RE.test(minuteToken)) return null;
+  const token = encodeURIComponent(minuteToken);
   const meta = await feishuRequest<{ topic?: string; title?: string; name?: string }>(
     "GET",
-    "/minutes/v1/minutes/" + minuteToken,
+    "/minutes/v1/minutes/" + token,
   );
   const transcript = await feishuRequest<{
     transcript?: { paragraphs?: TranscriptParagraph[] };
-  }>("GET", "/minutes/v1/minutes/" + minuteToken + "/transcript?list=true");
+  }>("GET", "/minutes/v1/minutes/" + token + "/transcript?list=true");
   const paragraphs = transcript?.data?.transcript?.paragraphs ?? [];
   const lines = paragraphs.map((p) => {
     const text = (p.elements ?? []).map((e) => e.text_content?.text ?? "").join("");

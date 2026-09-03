@@ -6,18 +6,34 @@
  */
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireBearer } from "@/app/api/write-context";
 import { decisionCardToFeishuCard } from "@/server/feishu/aily";
 import { consult } from "@/server/service";
 
 export const runtime = "nodejs";
 
+/** 只接受 ProjectFacts 里真实存在的字段,避免任意键被原样写入事实表。 */
+const factsSchema = z
+  .object({
+    sampleCount: z.number().optional(),
+    dv200: z.number().optional(),
+    rnaInputNg: z.number().optional(),
+    material: z.string().max(200).optional(),
+    species: z.string().max(200).optional(),
+    goal: z.string().max(400).optional(),
+  })
+  .strict();
+
 const bodySchema = z.object({
-  question: z.string().min(1),
-  facts: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
+  question: z.string().min(1).max(4000),
+  facts: factsSchema.optional(),
   locale: z.enum(["zh", "en", "ja"]).optional(),
 });
 
 export async function POST(request: Request) {
+  // 该入口会跑完整咨询管线并落库(可能还要计费调用模型),不能匿名访问。
+  const unauthorized = requireBearer(request);
+  if (unauthorized) return unauthorized;
   const parsed = bodySchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) {
     return NextResponse.json({ error: "INVALID_AILY_INPUT" }, { status: 400 });
@@ -27,7 +43,7 @@ export async function POST(request: Request) {
   const result = await consult({
     question: body.question,
     locale: body.locale ?? "zh",
-    facts: (body.facts ?? {}) as import("@/domain/consultation-journey").ProjectFacts,
+    facts: body.facts ?? {},
     tenantId: "feishu-aily",
     traceId,
     projectId: "AILY-" + traceId,
