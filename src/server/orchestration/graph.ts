@@ -33,7 +33,17 @@ import {
   saveDecisionCard,
   saveExpertCase,
 } from "../db/repositories";
-import { chunkCount, search, seedKnowledgeBase, type RetrievedChunk } from "../rag/retrieval";
+import {
+  backfillSemanticVectors,
+  chunkCount,
+  searchWithDiagnostics,
+  type RetrievalDiagnostics,
+  type RetrievedChunk,
+} from "../rag/retrieval";
+import { seedKnowledgeWithIngestion } from "../rag/ingest";
+import { auditCitations, recordCitationAudit } from "../guards/citation-audit";
+import { enqueueReviewSample } from "../telemetry/review-samples";
+import { embedSemantic } from "../rag/semantic";
 import { syncDecisionCard } from "../feishu/bitable";
 import {
   searchSimilarCases,
@@ -78,7 +88,11 @@ export type GraphNode =
   | "review"
   | "risk-gate"
   | "escalate"
-  | "finalize";
+  | "finalize"
+  /** 埋点 A:出卡前引用号反查审计(指标体系 v1.1 第 12 节)。 */
+  | "citation-audit"
+  /** 埋点 B:抽样入复核队列(误拦截率 / 该转未转率的唯一真值来源)。 */
+  | "review-sample";
 
 export interface GraphResult extends ConsultationResult {
   path: GraphNode[];
@@ -168,7 +182,12 @@ export async function runConsultationGraph(
 
   // 检索前确保知识库已就绪:无论先访问哪个页面(如专家工作台),交接包
   // 都必须带真实证据链,而不是空检索。幂等,已加载时零成本。
-  if (chunkCount(db) === 0) seedKnowledgeBase(db);
+  if (chunkCount(db) === 0) seedKnowledgeWithIngestion(db);
+  // 再补一次语义向量。不能只在「刚种库」时补 —— 首页的 ensureSeeded() 是同步
+  // 的(React server component 里不适合等 24MB 模型),它先种完库,这里
+  // chunkCount 就不为 0 了;存量 v2 库升级上来同理。所以按「缺哪条补哪条」
+  // 做,而不是按「是否刚建库」。空缺为零时只是一次 0 行查询。
+  await backfillSemanticVectors(db);
 
   // ── ingest ──
   upsertProject(db, {
@@ -233,19 +252,34 @@ export async function runConsultationGraph(
     verified: number;
     grounding: string;
     dropped: number;
+    /** 本轮检索走的通道与向量空间(方案量化指标的检索侧数据源)。 */
+    retrieval: RetrievalDiagnostics;
   }> = [];
+
+  // 查询侧语义向量只算一次 —— 三轮加深检索用的是同一句查询文本,变的只有
+  // hint 与 topK。模型不可用时为 null,检索自动退回哈希向量空间。
+  const retrievalQuery = `${input.question} ${scenario}`;
+  const semanticQueryVector = await embedSemantic(retrievalQuery);
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const hint = broadenHint(baseHint, round);
     const topK = 5 * 2 ** round; // 5 → 10 → 20
 
-    chunks = search(db, `${input.question} ${scenario}`, { appliesToHint: hint, topK });
+    const retrieved = searchWithDiagnostics(db, retrievalQuery, {
+      appliesToHint: hint,
+      topK,
+      semanticQueryVector,
+    });
+    chunks = retrieved.hits;
     visit("retrieve", {
       round,
       hint,
       topK,
       chunks: chunks.map((c) => c.chunkId),
       similarCases: similarCases.map((c) => c.projectId),
+      // 落进 checkpoint:量化指标里的「短查询回退触发率」「检索 P95」与
+      // 「语义/哈希空间占比」全部从这里离线统计,不需要另建埋点表。
+      retrieval: retrieved.diagnostics,
     });
 
     actor = await runActor(
@@ -290,6 +324,7 @@ export async function runConsultationGraph(
       verified: critic.verified.length,
       grounding: grounding.provider,
       dropped: grounding.dropped.length,
+      retrieval: retrieved.diagnostics,
     });
     visit("review", {
       round,
@@ -425,6 +460,57 @@ export async function runConsultationGraph(
         now: input.now,
       });
     }
+  }
+
+  // ── 埋点 A · 出卡前引用号反查审计 ────────────────────────────────
+  // 落在 return 之前、所有分支之后:转专家的卡也要审 —— 「转专家」不等于「没引用」,
+  // 交接包里带着的证据链同样要绑定成立,否则专家拿到的是一份看起来有据的空壳。
+  const citationAudit = auditCitations(card, evidence, input.now.slice(0, 10));
+  recordCitationAudit(db, {
+    projectId: input.projectId,
+    traceId: input.traceId,
+    cardStatus: status,
+    audit: citationAudit,
+    now: input.now,
+  });
+  visit("citation-audit", {
+    total: citationAudit.total,
+    bound: citationAudit.bound,
+    bindingRate: citationAudit.bindingRate,
+    violations: citationAudit.violations,
+  });
+
+  // ── 埋点 B · 抽样入人工复核队列 ──────────────────────────────────
+  // 只有两类会话有复核价值:转了专家的(可能拦错了)和给了正式结论的(可能该转
+  // 未转)。needs-conditions 不入队 —— 那是还在问用户补信息,系统还没做处置判断,
+  // 拿去让专家判「应放还是应拦」是让人给一个尚未发生的决定打分。
+  // 抽样只在 recordMemory 打开时进行(= 真实用户会话)。NovaBench 与单测跑的是
+  // 同一段图,但它们的 9 条金标会把队列灌满假样本,而金标本身已经有确定的期望值,
+  // 不需要人来复核。
+  if (input.recordMemory && (status === "expert-review" || status === "formal")) {
+    const sampled = enqueueReviewSample(db, {
+      kind: status === "expert-review" ? "intercepted" : "not-escalated",
+      projectId: input.projectId,
+      traceId: input.traceId,
+      systemAction:
+        status === "expert-review"
+          ? `expert-review · ${risk.mandatoryEscalation ? "强制升级" : "核验未通过"} · 风险 ${risk.score}`
+          : `formal · ${recommendations.length} 条建议 · 风险 ${risk.score}`,
+      // 复核人需要的是「当时系统看到了什么」,不是整张卡:问题、已确认事实、风险
+      // 信号、引用号。够他判断「换我会不会也这么处置」,又不至于把全文塞进一行。
+      context: {
+        question: input.question,
+        facts: input.facts,
+        scenario,
+        riskLevel: risk.level,
+        riskScore: risk.score,
+        riskSignals: risk.signals,
+        citations: card.recommendations.flatMap((r) => r.evidenceIds),
+        criticApproved: critic.approved,
+      },
+      now: input.now,
+    });
+    if (sampled) visit("review-sample", { kind: status === "expert-review" ? "intercepted" : "not-escalated" });
   }
 
   return {

@@ -53,3 +53,11 @@ deliverables/NovaPilot_竞赛融合终版_交付包/NovaPilot_PRD_最终版/*.do
 
 # NovaPilot local database
 .data/
+
+# 内部方案与指标文档(仅本地参考,不进仓库)
+NovaPilot优化落地与工业化升级方案_*.md
+NovaPilot量化指标体系_*.md
+
+# B2 语义嵌入模型(24MB 二进制,由 scripts/fetch-embedding-model.mjs 拉取)
+models/
+.model-cache/

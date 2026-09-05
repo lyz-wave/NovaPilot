@@ -96,7 +96,15 @@ describe("Stage 4 · consultation orchestration graph", () => {
     expect(nodes[0]).toBe("ingest");
     expect(nodes).toContain("retrieve");
     expect(nodes).toContain("review");
-    expect(nodes[nodes.length - 1]).toMatch(/finalize|escalate/);
+    // 处置节点必须是 finalize / escalate 二者之一,且是最后一个**处置**节点。
+    // 尾部的 citation-audit / review-sample 是埋点检查点(指标体系第 12 节),
+    // 它们落在处置之后 —— 断言改成「最后一个非埋点节点」而不是「最后一个节点」,
+    // 否则每加一个埋点都要来改这一行,而这一行想钉住的其实是处置分支的收口。
+    const TELEMETRY: string[] = ["citation-audit", "review-sample"];
+    const decisions = nodes.filter((n) => !TELEMETRY.includes(n));
+    expect(decisions[decisions.length - 1]).toMatch(/finalize|escalate/);
+    // 埋点 A 对每一条会话都要出数(转专家的卡也要审引用),所以它一定在。
+    expect(nodes).toContain("citation-audit");
   });
 
   it("prohibits execution CTAs unless the card is formal", async () => {

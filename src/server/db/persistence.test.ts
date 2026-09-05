@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { createDb, migrate, type NovaDb } from "./client";
+import { SCHEMA_VERSION } from "./schema";
 import {
   upsertProject,
   getProject,
@@ -30,7 +31,7 @@ describe("Stage 1 · persistence layer (SQLite)", () => {
     const row = db
       .prepare("SELECT value FROM schema_meta WHERE key='schema_version'")
       .get() as { value: string };
-    expect(row.value).toBe("1");
+    expect(row.value).toBe(SCHEMA_VERSION);
   });
 
   it("creates and reads back a project", () => {

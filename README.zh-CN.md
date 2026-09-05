@@ -49,25 +49,37 @@ NovaPilot 是面向**科研客户技术支持与咨询**的 AI 智能服务体�
 
 ## 架构亮点
 
-- **确定性编排状态机**(LangGraph 替代):每节点落 DB checkpoint,可审计可重放。
+- **确定性编排状态机**(参考 LangGraph 有状态图模型的零依赖实现,不依赖该框架):每节点落 DB checkpoint,可审计可重放。
 - **Actor–Critic 双智能体 + 规则终审**:模型只写散文,标题/引用/边界由规则派生,幻觉引用不可能通过。
 - **三层证据接地防线**:检索接地 → 规则核验 → 语义复核,任何一层可拒绝推荐;三轮无证据即携完整论证链转专家,绝不硬编。
+- **两段式混合检索**:SQLite FTS5(trigram)候选生成 → BM25 + 稠密向量融合 → rerank。稠密通道用内置的
+  `bge-small-zh-v1.5`(ONNX int8,纯 WASM 推理、零原生二进制),模型缺失时**整体降级**到确定性哈希向量,检索链路不中断。
 - **NovaGuard 可信控制**:证据白名单(有据才答)、风险分级审批(该转就转)、写契约(401/403/412/428)。
+- **可版本管理的知识摄取管线**:`data/knowledge/*.md`(frontmatter 由 zod 校验)经 `npm run kb:ingest` 入库,
+  **挂在 NovaBench 金标回归门禁上** —— 门禁 `stop` 就整批 SQLite ROLLBACK,没通过的知识一个 chunk 都不留。
+- **护栏对可观测性**:五处埋点(引用号反查审计 / 拦截与未转复核抽样 / 案例闭环入流 / 隐式采纳 / 端到端延迟)
+  让运营看板的每个激励指标都**在类型层面**必须配一个护栏指标,同源同窗成对出数。
 - **科学决策卡**核心工件:formal / provisional / needs-conditions / expert-review 四态状态机(ADR-0004)。
-- **离线确定性是硬不变式**:145 个单测 + 14 个 Playwright 验收脚本全部可离线复现。
+- **离线运行是硬不变式**:363 个单测 + 14 个 Playwright 验收脚本全部可离线复现。检索的稠密通道**可确定性降级**
+  (`NP_DISABLE_SEMANTIC=1` 即回到全链路逐位确定性),其余环节无条件确定。
 
 ## 技术栈
 
 - **前端**:Next.js 15(App Router)、React 19、TypeScript、zod、lucide-react
 - **后端**:Next.js API Routes、Node 内置 `node:sqlite`(零原生依赖)、领域驱动设计
-- **AI**:OpenAI 兼容模型网关(豆包火山方舟 / Claude / 自建)带离线确定性回退
-- **测试**:Vitest(145 个单测)+ Playwright(14 个 E2E 验收脚本)
+- **AI**:OpenAI 兼容模型网关(豆包火山方舟 / Claude / 自建)带离线确定性回退;
+  语义嵌入用 `onnxruntime-web` 纯 WASM 后端(无原生绑定,三平台同一份产物)
+- **测试**:Vitest(363 个单测)+ Playwright(14 个 E2E 验收脚本)
 
 ## 快速开始
 
     npm install
+    npm run model:fetch        # 拉语义嵌入模型(23 MB,一次即可;免安装包已内置)
     npm run build
     PORT=3210 npm start
+
+> `model:fetch` 是唯一需要联网的一步,且**可以跳过** —— 跳过后检索自动降级到确定性
+> 哈希向量,功能完整,只是语义化提问的召回质量下降(见 `docs/B2-语义向量验收记录.md`)。
 
 浏览器打开:
 
@@ -80,9 +92,20 @@ NovaPilot 是面向**科研客户技术支持与咨询**的 AI 智能服务体�
 
 ### 质量验证
 
-    npm test            # 145 个单测
+    npm test            # 363 个单测
     npm run typecheck   # tsc --noEmit
     npm run build       # 生产构建
+    npm run model:smoke # 语义向量烟雾测试(验证本机 WASM 后端可离线推理)
+
+### 知识库与运营命令
+
+    npm run kb:ingest              # 摄取 data/knowledge/*.md,过金标门禁才提交
+    npm run kb:ingest -- --dry-run # 只解析和分块,不写库
+    npm run model:backfill         # 给缺语义向量的 chunk 补齐 512 维向量
+    npm run review:judge           # 跑 LLM 初判,给复核队列里的抽样样本出 judge 结论
+
+> 内置知识库 **15 篇文档 / 54 chunk**(7 篇种子 + `data/knowledge/` 下 8 篇 SOP)。
+> 摄取是幂等的(按 doc id 删旧重插),重跑不会膨胀。详见 `docs/B3-知识摄取验收记录.md`。
 
 ### E2E 验收脚本(本地,端口 3210)
 
@@ -101,16 +124,22 @@ expert · knowledge · operations · click-audit · smoke,每个脚本输出 PAS
       server/
         orchestration/         确定性编排图 + checkpoint
         agents/                Actor-Critic、意图分类、模型网关
-        rag/                   混合检索、种子知识、案例记忆
-        guards/                NovaGuard 发布门禁
+        rag/                   混合检索、种子知识、案例记忆、知识摄取管线
+        guards/                NovaGuard 发布门禁、引用号反查审计
+        telemetry/             五处埋点(复核抽样 / 案例闭环 / 采纳 / 延迟)+ 护栏对看板口径
         eval/                  NovaBench 金标集、受治理晋级
         db/                    SQLite schema 与仓储
         feishu/                飞书集成模块(凭证门控)
+    data/
+      knowledge/               可版本管理的知识源(8 篇 SOP,frontmatter 由 zod 校验)
     docs/
       adr/                     13 项架构决策记录
       feishu/                  飞书集成说明 + 妙搭配方
     deliverables/              竞赛文档(大纲、PDF、架构 SVG)
     docs/前端优化说明.md              前端优化记录(9.1–9.15)
+    docs/B1-检索升级验收记录.md        FTS5 中文全文检索
+    docs/B2-语义向量验收记录.md        真实语义向量(纯 WASM)
+    docs/B3-知识摄取验收记录.md        知识摄取管线 + 五处埋点 + 护栏对看板
 
 ## ADR 精选
 

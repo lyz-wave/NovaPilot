@@ -104,7 +104,12 @@ const RETRY_MAX_TOKENS = 16384;
  */
 const MODEL_TIMEOUT_MS = 120_000;
 
-function resolveConfig(cfg: ModelGatewayConfig = {}): Required<
+/**
+ * 导出给离线脚本用:脚本需要在真正调用之前判断「到底有没有可用凭证、用的是哪个
+ * 模型」。让脚本自己重读一遍环境变量会产生第二套解析规则,两套一旦不一致,脚本
+ * 报的模型名和实际调用的模型就不是同一个。
+ */
+export function resolveConfig(cfg: ModelGatewayConfig = {}): Required<
   Pick<ModelGatewayConfig, "provider" | "model" | "miniModel">
 > & { apiKey?: string; baseUrl?: string; fallback?: ModelGatewayConfig["fallback"] } {
   const env = process.env;

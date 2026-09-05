@@ -7,6 +7,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  ClipboardCopy,
   Clock3,
   FileDown,
   FileText,
@@ -40,6 +41,50 @@ function formatTime(iso: string): string {
   if (!iso) return "";
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? "" : d.toLocaleString("zh-CN", { hour12: false });
+}
+
+/**
+ * 埋点 D · 上报一次采纳动作(复制 / 导出 / 同步)。
+ *
+ * 刻意 fire-and-forget 且吞掉所有错误:用户点「导出」要的是文件,不是一次网络请求。
+ * 埋点挂了就少一条数据,绝不能让导出按钮转圈或报错 —— 观测设施的可用性优先级低于
+ * 它观测的功能。也刻意不 await,避免在文件下载前插入一次 RTT。
+ */
+function reportAdoption(
+  projectId: string,
+  cardId: string,
+  action: "copy" | "export" | "sync",
+  surface: string,
+) {
+  void fetch("/api/adoption", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: "Bearer demo-research-session",
+    },
+    body: JSON.stringify({ projectId, cardId, action, surface }),
+  }).catch(() => {});
+}
+
+/**
+ * 复制用的纯文本要点(不是完整 Markdown)。
+ *
+ * 复制的使用场景是粘到群里、粘到邮件里、粘到项目周报里 —— 那里没人想看 JSON 附录
+ * 和三级标题。所以复制走「结论 + 主方案 + 引用号」这个精简口径,导出才给完整可复现
+ * 文档。引用号必须带上:一段脱离引用号的结论粘到群里,就是一句无出处的断言。
+ */
+function cardToPlainText(result: ConsultationResult): string {
+  const c = result.card;
+  const lines = [`【${statusLabel(c.status)}】${c.title}`, "", c.executiveSummary];
+  if (c.recommendations.length > 0) {
+    lines.push("", "主方案:");
+    for (const r of c.recommendations) {
+      const cites = r.evidenceIds.length > 0 ? `[${r.evidenceIds.join(" ")}]` : "";
+      lines.push(`- ${r.title}${cites ? ` ${cites}` : ""}`);
+    }
+  }
+  lines.push("", `— NovaPilot ${c.id} v${c.version} · trace ${result.traceId}`);
+  return lines.join("\n");
 }
 
 /** Trigger a client-side file download (offline-safe; no server round-trip). */
@@ -134,6 +179,9 @@ export function DecisionCardPanel({
   const [appointmentRequested, setAppointmentRequested] = useState(false);
   const [versions, setVersions] = useState<CardVersionMeta[]>([]);
   const [exported, setExported] = useState(false);
+  // 复制有失败态(剪贴板 API 会被非安全上下文拒绝),不能只有 done/idle 两态,
+  // 否则用户按了没反应、也不知道该去哪拿内容。
+  const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle");
   const [glossaryOpen, setGlossaryOpen] = useState(false);
   const [highlightedEvidence, setHighlightedEvidence] = useState<string | null>(null);
   const tabsId = useId();
@@ -159,6 +207,7 @@ export function DecisionCardPanel({
   useEffect(() => {
     // 新卡片 = 新的交互周期:导出/授权/反馈/专家请求状态全部复位。
     setExported(false);
+    setCopied("idle");
     setConsentState("idle");
     setFeedbackDone(false);
     setReviewRequested(false);
@@ -262,13 +311,31 @@ export function DecisionCardPanel({
   }
 
   /** 导出决策卡(Markdown + JSON),图标按钮与博后视角动作共用。 */
-  function handleExport() {
+  function handleExport(surface: string) {
     downloadFile(
       `${result!.card.id}.md`,
       cardToMarkdown(result!),
       "text/markdown;charset=utf-8",
     );
     setExported(true);
+    reportAdoption(result!.project.id, result!.card.id, "export", surface);
+  }
+
+  /**
+   * 复制要点到剪贴板。
+   *
+   * 只在写入**成功**后才上报采纳 —— 剪贴板 API 在非安全上下文/无焦点时会拒绝,
+   * 那时候用户手里什么都没有,记一次「已采纳」是在给自己刷数。
+   */
+  async function handleCopy(surface: string) {
+    try {
+      await navigator.clipboard.writeText(cardToPlainText(result!));
+    } catch {
+      setCopied("failed");
+      return;
+    }
+    setCopied("done");
+    reportAdoption(result!.project.id, result!.card.id, "copy", surface);
   }
 
   async function consent() {
@@ -296,14 +363,28 @@ export function DecisionCardPanel({
           <h2>{result.card.title}</h2>
           <p>{result.card.id}</p>
         </div>
-        <button
-          className="icon-button"
-          aria-label="导出科研决策卡"
-          title="导出决策卡（Markdown + JSON）"
-          onClick={handleExport}
-        >
-          {exported ? <Check size={17} /> : <FileDown size={17} />}
-        </button>
+        <div className="card-head-actions">
+          <button
+            className="icon-button"
+            aria-label={copied === "failed" ? "复制失败,请手动导出" : "复制决策卡要点"}
+            title={
+              copied === "failed"
+                ? "浏览器拒绝了剪贴板写入，请改用导出"
+                : "复制要点（结论 + 主方案 + 引用号）"
+            }
+            onClick={() => void handleCopy("card-header")}
+          >
+            {copied === "done" ? <Check size={17} /> : <ClipboardCopy size={17} />}
+          </button>
+          <button
+            className="icon-button"
+            aria-label="导出科研决策卡"
+            title="导出决策卡（Markdown + JSON）"
+            onClick={() => handleExport("card-header")}
+          >
+            {exported ? <Check size={17} /> : <FileDown size={17} />}
+          </button>
+        </div>
       </div>
 
       <div className={`card-status risk-${risk.level}`}>
@@ -566,7 +647,7 @@ export function DecisionCardPanel({
 
       {role === "postdoc" && (
         <div className="role-actions">
-          <button onClick={handleExport}>
+          <button onClick={() => handleExport("role-actions-postdoc")}>
             <FileDown size={14} aria-hidden="true" /> 导出决策卡(复现)
           </button>
         </div>

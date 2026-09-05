@@ -108,9 +108,12 @@ function factsBlock(facts?: ProjectFacts): string {
  */
 function similarCasesBlock(cases?: SimilarCase[]): string {
   if (!cases || cases.length === 0) return "";
-  const lines = cases.map(
-    (c) => `- [${c.scenario} · ${c.status}] ${c.question} —（${c.factsDigest}）→ ${c.outcome}`,
-  );
+  const lines = cases.map((c) => {
+    // 冷启动样例在提示词里也标出来。Actor 拿到「这是样例不是真实先例」的信息,
+    // 才不会写出「我们此前为多位客户……」这种把样例说成战绩的措辞。
+    const tag = c.provenance === "cold-start" ? " · 冷启动样例(非真实项目)" : "";
+    return `- [${c.scenario} · ${c.status}${tag}] ${c.question} —（${c.factsDigest}）→ ${c.outcome}`;
+  });
   return (
     `\n\n参考历史相似案例（仅供参考的先例，非证据，严禁作为引用来源）/ ` +
     `Similar past cases (precedent for context ONLY — never cite these):\n${lines.join("\n")}`

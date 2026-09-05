@@ -74,15 +74,49 @@ CREATE TABLE IF NOT EXISTS documents (
   validation   TEXT NOT NULL DEFAULT 'verified'
 );
 
+-- embedding_semantic 是 B2 新增的真实语义向量(bge-small-zh-v1.5,512 维)。
+-- 它可以为 NULL —— 模型缺失时入库仍要成功,只是这一列空着,检索整体降级到
+-- embedding 那一列的确定性哈希向量。两个向量空间维度和量纲都不同,绝不能混算,
+-- 空间选择由 retrieval.ts 统一裁决(见那里的 vectorSpace 诊断)。
 CREATE TABLE IF NOT EXISTS chunks (
-  id           TEXT PRIMARY KEY,
-  document_id  TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-  ordinal      INTEGER NOT NULL,
-  text         TEXT NOT NULL,
-  tokens       TEXT NOT NULL,           -- JSON string[] normalized terms (BM25)
-  embedding    TEXT NOT NULL           -- JSON number[] vector
+  id                 TEXT PRIMARY KEY,
+  document_id        TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  ordinal            INTEGER NOT NULL,
+  text               TEXT NOT NULL,
+  tokens             TEXT NOT NULL,      -- JSON string[] normalized terms (BM25)
+  embedding          TEXT NOT NULL,      -- JSON number[] 确定性哈希向量(256 维)
+  embedding_semantic TEXT                -- JSON number[] 语义向量(512 维),可为 NULL
 );
 CREATE INDEX IF NOT EXISTS idx_chunks_document ON chunks(document_id);
+
+-- ── 全文检索索引 (FTS5) ────────────────────────────────────────
+-- 候选生成用,不参与打分:BM25 + 向量融合 + rerank 仍在 retrieval.ts 里算。
+-- 分词器必须是 trigram 而不是 unicode61 —— unicode61 把连续汉字当成一个
+-- token,「超微量建库流程」里查「建库」得 0 命中,中文检索会整体失效。
+-- trigram 的代价是 <3 字的查询结构性漏召(见 retrieval.ts 的回退通道)。
+CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
+  chunk_id    UNINDEXED,
+  document_id UNINDEXED,
+  content,
+  tokenize = 'trigram'
+);
+
+-- 三个触发器保证 chunks 与 chunks_fts 严格同步。DELETE 触发器不可省:
+-- removeDocument(一键回滚)删 chunks 后,FTS 表若不同步,已被回滚的知识
+-- 仍能被检索到并当作证据引用,直接违背「受控进化」语义。
+-- (实测:documents 的 ON DELETE CASCADE 删除 chunks 时该触发器同样会触发。)
+CREATE TRIGGER IF NOT EXISTS trg_chunks_fts_ai AFTER INSERT ON chunks BEGIN
+  INSERT INTO chunks_fts(chunk_id, document_id, content)
+  VALUES (new.id, new.document_id, new.text);
+END;
+CREATE TRIGGER IF NOT EXISTS trg_chunks_fts_ad AFTER DELETE ON chunks BEGIN
+  DELETE FROM chunks_fts WHERE chunk_id = old.id;
+END;
+CREATE TRIGGER IF NOT EXISTS trg_chunks_fts_au AFTER UPDATE ON chunks BEGIN
+  DELETE FROM chunks_fts WHERE chunk_id = old.id;
+  INSERT INTO chunks_fts(chunk_id, document_id, content)
+  VALUES (new.id, new.document_id, new.text);
+END;
 
 -- ── Knowledge graph (Neo4j replacement) ────────────────────────
 CREATE TABLE IF NOT EXISTS graph_nodes (
@@ -233,6 +267,10 @@ CREATE TABLE IF NOT EXISTS case_memory (
   outcome      TEXT NOT NULL,          -- one-line recommended route summary
   tokens       TEXT NOT NULL,          -- JSON string[] normalized terms (BM25)
   embedding    TEXT NOT NULL,          -- JSON number[] vector
+  -- B3-4:这条记忆是哪来的。resolved = 真实办结的咨询;cold-start = 随包发布的
+  -- 冷启动样例。相似案例会被喂给 Actor 影响措辞,所以「这是真实先例还是我们写的
+  -- 样例」必须能区分 —— 冷启动样例在 UI 上标注待 Coach 复核,不能冒充历史战绩。
+  provenance   TEXT,                   -- resolved | cold-start(NULL 视为 resolved)
   created_at   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_case_memory_tenant ON case_memory(tenant_id);
@@ -260,6 +298,160 @@ CREATE TABLE IF NOT EXISTS gate_events (
   created_at  TEXT NOT NULL,
   resolved_at TEXT
 );
+
+-- ── 知识摄取日志 (B3 摄取流水线) ───────────────────────────────
+-- 每次 npm run kb:ingest 落一行,记录摄取了哪些文档、多少 chunk、金标回归
+-- 门禁判定、以及回归不过时是否已回滚。知识库的每一次变更都要有据可查 ——
+-- 「受控进化」不能只体现在候选知识那条链路上,批量摄取同样要留痕。
+CREATE TABLE IF NOT EXISTS ingest_runs (
+  id           TEXT PRIMARY KEY,
+  source_dir   TEXT NOT NULL,
+  doc_count    INTEGER NOT NULL,
+  chunk_count  INTEGER NOT NULL,
+  docs         TEXT NOT NULL,            -- JSON [{id,file,title,chunks}]
+  parse_errors TEXT NOT NULL DEFAULT '[]', -- JSON string[]
+  gate         TEXT NOT NULL,            -- JSON 金标回归门禁判定,未跑时为 null
+  outcome      TEXT NOT NULL,            -- committed | rolled-back | parse-failed
+  detail       TEXT NOT NULL DEFAULT '',
+  created_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ingest_runs_created ON ingest_runs(created_at);
+
+-- ══ 指标体系 v1.1 第 12 节:四处埋点缺口 ═══════════════════════════
+-- 指标体系点出现有系统缺四处采集。补上它们的目的不是「多几张表」,而是让看板上
+-- 的护栏对(第 10 节)真正成对有数 —— 只有激励指标有数、护栏指标没数的看板,
+-- 比没有看板更危险,因为它会让人以为自己在被约束。
+
+-- ── 埋点 A:引用号反查审计(服务「证据绑定率」) ─────────────────
+-- 每出一张卡就把卡上每个引用号拿回本轮检索结果里反查一遍:在不在、是否
+-- verified、是否过期。这是本系统的生命线指标(目标 100%,非估算),所以它必须由
+-- 一段**独立于生成路径**的代码判定 —— Critic 放行不等于绑定成立,自己证明自己
+-- 通过没有意义。绑定率 < 100% 时同时落一条 quality_events(P0)。
+CREATE TABLE IF NOT EXISTS citation_audits (
+  id            TEXT PRIMARY KEY,
+  project_id    TEXT NOT NULL,
+  trace_id      TEXT NOT NULL,
+  card_status   TEXT NOT NULL,
+  total         INTEGER NOT NULL,        -- 卡上引用号总数
+  bound         INTEGER NOT NULL,        -- 反查成立的个数
+  binding_rate  REAL NOT NULL,           -- bound / total;total=0 时记 1
+  violations    TEXT NOT NULL DEFAULT '[]', -- JSON [{citation,reason}]
+  created_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_citation_audits_created ON citation_audits(created_at);
+
+-- ── 埋点 B:拦截/未转样本复核队列(服务「误拦截率」「该转未转率」「judge 一致率」)
+-- 两级机制(指标体系 5.1):LLM 离线预审给「应放/应拦」判定 + 置信度,专家只审
+-- 分歧。所以一行里同时留 judge 判定与专家判定两套字段,agreement 由两者比对
+-- 得出 —— judge 只做预筛,终审权在专家手里,这是那一节写死的铁律。
+-- judge 是**离线任务**,不在运行时链路上,不破坏离线确定性约束。
+CREATE TABLE IF NOT EXISTS review_samples (
+  id              TEXT PRIMARY KEY,
+  kind            TEXT NOT NULL,         -- intercepted(被拦) | not-escalated(未转)
+  project_id      TEXT NOT NULL,
+  trace_id        TEXT NOT NULL,
+  system_action   TEXT NOT NULL,         -- 系统当时的处置
+  context         TEXT NOT NULL,         -- JSON 复核所需上下文摘要
+  judge_verdict   TEXT,                  -- should-pass | should-block | should-escalate | should-not-escalate
+  judge_confidence REAL,
+  judge_model     TEXT,
+  judge_at        TEXT,
+  expert_verdict  TEXT,                  -- 同上枚举;专家终审,缺省 NULL = 未审
+  expert_note     TEXT,
+  expert_at       TEXT,
+  agreement       TEXT,                  -- agree | disagree | pending(任一方缺失)
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_review_samples_kind ON review_samples(kind, created_at);
+
+-- ── 埋点 C:专家办结「是否产出候选知识」标记(服务「修订回流率」) ───
+-- 知识进化飞轮的转速表。为 0 说明进化闭环断裂 —— 专家在一次次解决同样的问题,
+-- 而系统一次也没学会。所以办结时必须回答这个问题,并且「否」也要填理由:
+-- 无脑填「否」和无脑填「是」一样会让指标失真,填了理由才能事后判断是真没有
+-- 可沉淀的东西,还是嫌麻烦。
+CREATE TABLE IF NOT EXISTS case_closures (
+  id             TEXT PRIMARY KEY,
+  case_id        TEXT NOT NULL,
+  project_id     TEXT NOT NULL,
+  owner          TEXT NOT NULL,
+  resolution     TEXT NOT NULL,          -- 办结结论
+  produced_candidate INTEGER NOT NULL,   -- 0 | 1
+  candidate_id   TEXT,                   -- 产出时指向 candidates.id
+  no_candidate_reason TEXT NOT NULL DEFAULT '',
+  created_at     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_case_closures_created ON case_closures(created_at);
+
+-- ── 埋点 D:决策卡采纳事件(服务「隐式采纳率」) ────────────────────
+-- 科研用户方案好用时默默复制走、从不点赞,只看显式负反馈会系统性高估不满。
+-- 复制/导出/同步三个动作都算主动采纳行为。
+-- 口径边界(指标体系 4.4):复制也可能是「复制去质疑」,所以隐式采纳率**只做
+-- 体验对冲指标,不进可信解决率计算链** —— 这张表的数据不允许被算进任何可信度
+-- 指标,否则它自己就成了可游戏化对象。
+CREATE TABLE IF NOT EXISTS adoption_events (
+  id           TEXT PRIMARY KEY,
+  project_id   TEXT NOT NULL,
+  card_id      TEXT NOT NULL,
+  action       TEXT NOT NULL,            -- copy | export | sync
+  surface      TEXT NOT NULL DEFAULT '', -- 触发位置,便于诊断
+  created_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_adoption_events_created ON adoption_events(created_at);
+CREATE INDEX IF NOT EXISTS idx_adoption_events_project ON adoption_events(project_id);
+
+-- ── 端到端延迟采样(服务第 10 节「P95 延迟 ↔ 防线通过率结构」这一对) ──
+-- 这一张不属于四处埋点,是护栏对重组时补的缺口:第 10 节要求延迟必须与防线结构
+-- 成对看(「优化延迟不得以防线为代价」),而系统里原本一个延迟数都没落库。
+-- 只记 API 边界的墙上时钟毫秒 + 处置状态 —— 有了状态,才能验证「延迟下降」不是
+-- 靠少走防线换来的:formal 与 expert-review 的延迟要分开看。
+-- 检索层的 elapsedMs 不能拿来充当这个数:它只覆盖一段,标成端到端 P95 是偷换口径。
+CREATE TABLE IF NOT EXISTS latency_samples (
+  id           TEXT PRIMARY KEY,
+  trace_id     TEXT NOT NULL,
+  route        TEXT NOT NULL,            -- consultations | consultations:stream
+  kind         TEXT NOT NULL,            -- research | chat
+  card_status  TEXT NOT NULL DEFAULT '', -- formal | expert-review | needs-conditions | ''
+  duration_ms  INTEGER NOT NULL,
+  created_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_latency_samples_created ON latency_samples(created_at);
 `;
 
-export const SCHEMA_VERSION = "1";
+export const SCHEMA_VERSION = "7";
+
+/**
+ * 存量库回填:FTS 表是 schema v2 新增的,老库里 chunks 已有数据但
+ * chunks_fts 为空。触发器只覆盖新写入,所以 migrate 时补一次差集。
+ * 幂等 —— 已在 FTS 里的 chunk 不会重复插入,每次启动都可安全执行。
+ */
+export const FTS_BACKFILL_SQL = `
+INSERT INTO chunks_fts(chunk_id, document_id, content)
+SELECT c.id, c.document_id, c.text
+FROM chunks c
+WHERE NOT EXISTS (SELECT 1 FROM chunks_fts f WHERE f.chunk_id = c.id);
+`;
+
+/**
+ * 逐列增补迁移:`CREATE TABLE IF NOT EXISTS` 对**已存在**的表是空操作,所以
+ * v2 老库升到 v3 时不会自动长出 `embedding_semantic` 列。migrate() 按
+ * `PRAGMA table_info` 判断后补 ALTER。
+ *
+ * 新增列必须可为 NULL 且无默认值 —— SQLite 的 ADD COLUMN 才能 O(1) 完成,
+ * 也正好对应「模型缺失时语义向量为空」的降级语义。
+ */
+export const ADDITIVE_COLUMNS: ReadonlyArray<{
+  table: string;
+  column: string;
+  ddl: string;
+}> = [
+  {
+    table: "chunks",
+    column: "embedding_semantic",
+    ddl: "ALTER TABLE chunks ADD COLUMN embedding_semantic TEXT",
+  },
+  {
+    table: "case_memory",
+    column: "provenance",
+    ddl: "ALTER TABLE case_memory ADD COLUMN provenance TEXT",
+  },
+];

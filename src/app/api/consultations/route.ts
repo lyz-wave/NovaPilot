@@ -4,6 +4,7 @@ import { requireWriteContext } from "../write-context";
 import { respond, conversationContext } from "@/server/service";
 import { getDb } from "@/server/db/client";
 import { getCheckpoints } from "@/server/orchestration/graph";
+import { recordLatencySample } from "@/server/telemetry/latency";
 
 // Node runtime required for node:sqlite (not available on the edge runtime).
 export const runtime = "nodejs";
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
     });
   }
 
+  const startedAt = performance.now();
   const outcome = await respond({
     question,
     locale,
@@ -57,6 +59,17 @@ export async function POST(request: Request) {
     tenantId: write.context.tenantId,
     traceId: write.context.traceId,
     conversationId,
+  });
+
+  // 延迟采样带处置状态:护栏要验证的是「延迟下降不是靠少走防线换来的」,
+  // 一个不分状态的全局 P95 分不出这两种情况(见 telemetry/latency.ts)。
+  recordLatencySample(getDb(), {
+    traceId: write.context.traceId,
+    route: "consultations",
+    kind: outcome.kind === "chat" ? "chat" : "card",
+    cardStatus: outcome.kind === "chat" ? "" : outcome.card.status,
+    durationMs: performance.now() - startedAt,
+    now: new Date().toISOString(),
   });
 
   const contextUsage = conversationContext(
@@ -95,7 +108,18 @@ function streamConsultation(input: {
         send("start", { traceId: input.traceId });
         // Classify + run. Chat turns skip the graph entirely (no checkpoints);
         // research turns run the graph and we replay its persisted checkpoints.
+        const startedAt = performance.now();
         const outcome = await respond(input);
+        // 量到 respond 返回,不含后续 SSE 帧的推送时间 —— 那部分取决于客户端读取
+        // 速度,把它算进服务端延迟会让同一次咨询在不同网络下出不同的 P95。
+        recordLatencySample(getDb(), {
+          traceId: input.traceId,
+          route: "consultations:stream",
+          kind: outcome.kind === "chat" ? "chat" : "card",
+          cardStatus: outcome.kind === "chat" ? "" : outcome.card.status,
+          durationMs: performance.now() - startedAt,
+          now: new Date().toISOString(),
+        });
         const contextUsage = conversationContext(
           getDb(),
           input.conversationId ?? input.tenantId,

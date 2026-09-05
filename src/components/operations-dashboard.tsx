@@ -88,8 +88,80 @@ export interface QualityEvent {
   resolvedAt: string | null;
 }
 
-const AUTH = "Bearer demo-research-session";
-const WRITE_HEADERS = {
+/**
+ * 护栏对看板载荷(客户端镜像,与 server/telemetry/guardrail-board.ts 对齐)。
+ *
+ * 指标体系 v1.1 第 10 节的整张表在这里落成 UI:每个激励指标必须与它的护栏指标
+ * 同框渲染。这不是排版偏好 —— 只有激励指标有数、护栏指标没数的看板,比没有看板
+ * 更危险,因为它会让人以为自己在被约束。所以下面的 `PairRow` 结构里护栏侧是
+ * 必填字段:想在这张板上加一个激励指标,就必须同时写出它的护栏。
+ */
+interface RateLike {
+  reviewed: number;
+  wrong: number;
+  rate: number | null;
+  pending: number;
+}
+interface LatencyStatsView {
+  samples: number;
+  p50: number | null;
+  p95: number | null;
+  max: number | null;
+}
+export interface GuardrailBoardView {
+  since: string | null;
+  sessions: {
+    sessions: number;
+    formal: number;
+    expertReview: number;
+    needsConditions: number;
+    other: number;
+  };
+  directResolutionRate: number | null;
+  interceptionRate: number | null;
+  trustedResolutionRate: number | null;
+  binding: {
+    cards: number;
+    citations: number;
+    bound: number;
+    bindingRate: number;
+    violatingCards: number;
+  };
+  review: {
+    falseInterception: RateLike;
+    missedEscalation: RateLike;
+    judgeAgreement: { compared: number; agreed: number; rate: number | null };
+  };
+  inflow: {
+    closures: number;
+    withCandidate: number;
+    inflowRate: number;
+    noCandidateReasons: Array<{ reason: string; count: number }>;
+  };
+  adoption: {
+    cards: number;
+    adoptedCards: number;
+    adoptionRate: number;
+    events: number;
+    byAction: { copy: number; export: number; sync: number };
+  };
+  latency: { overall: LatencyStatsView; byStatus: Array<{ status: string; stats: LatencyStatsView }> };
+  knowledge: {
+    documents: number;
+    chunks: number;
+    rolledBackRuns: number;
+    candidatesApproved: number;
+    candidatesPending: number;
+    documentsTotal: number;
+    chunksTotal: number;
+  };
+  feedback: { total: number; negative: number; negativeRate: number | null };
+  p0: string[];
+  p1: string[];
+  pendingReview: number;
+}
+
+const AUTH = "Bearer demo-research-session";const WRITE_HEADERS = {
   authorization: AUTH,
   "content-type": "application/json",
   "x-tenant-id": "novapilot-demo",
@@ -98,8 +170,145 @@ const WRITE_HEADERS = {
 };
 
 const pct = (value: number) => (value * 100).toFixed(1) + "%";
+/**
+ * 可空率的渲染。null → 「—」,不是 0%。
+ *
+ * 一个写着 0% 误拦率的空队列会让人以为系统已经被验证过了。这一个字符的差别
+ * 是「这项还没人验证」和「验证过,没问题」之间的全部差别。
+ */
+const pctOrDash = (value: number | null) => (value == null ? "—" : pct(value));
+const msOrDash = (value: number | null) => (value == null ? "—" : Math.round(value) + " ms");
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString("zh-CN", { hour12: false });
+
+/** 护栏对的一行。护栏侧是必填 —— 结构上不允许一个激励指标单独出现在板上。 */
+interface PairRow {
+  /** 激励指标名 */
+  incentive: string;
+  /** 激励指标当前值 */
+  incentiveValue: string;
+  /** 第 10 节原文的「游戏化路径」:不写出来,读数的人就不知道该防什么。 */
+  gaming: string;
+  /** 护栏指标名(可为「A + B」的复合护栏) */
+  guardrail: string;
+  /** 护栏指标当前值 */
+  guardrailValue: string;
+  /** 第 10 节原文的「判定」 */
+  verdict: string;
+  /** 护栏状态:breach 破口 / watch 欠观测 / ok 成对有数且未破 */
+  state: "breach" | "watch" | "ok";
+  /** 样本量说明。看板上必须写:样本量不明的率不能当结论用。 */
+  basis: string;
+}
+
+/**
+ * 第 10 节六对护栏,逐行构造。
+ *
+ * 顺序与文档表格一致,方便对照核验。`state` 的判定规则:
+ *  - breach:护栏指标已破口(有数且超阈/非零)
+ *  - watch:护栏指标没有样本(rate === null)—— 激励指标的数此刻不该被当成结论
+ *  - ok:成对有数且未破
+ */
+function guardrailPairs(board: GuardrailBoardView, report: GateReport): PairRow[] {
+  const r = board.review;
+  const defenceStructure =
+    `formal ${board.sessions.formal} / 转专家 ${board.sessions.expertReview} / ` +
+    `待澄清 ${board.sessions.needsConditions}`;
+  return [
+    {
+      incentive: "直接解决率",
+      incentiveValue: pctOrDash(board.directResolutionRate),
+      gaming: "硬答不该答的",
+      guardrail: "该转未转率",
+      guardrailValue: pctOrDash(r.missedEscalation.rate),
+      verdict: "任一超阈即冻结「解决率」评比",
+      state:
+        r.missedEscalation.rate == null
+          ? "watch"
+          : r.missedEscalation.rate > 0.05
+            ? "breach"
+            : "ok",
+      basis: `复核 ${r.missedEscalation.reviewed} 条 / 待复核 ${r.missedEscalation.pending} 条`,
+    },
+    {
+      incentive: "Critic 拦截率",
+      incentiveValue: pctOrDash(board.interceptionRate),
+      gaming: "宁可全拦",
+      guardrail: "误拦截率",
+      guardrailValue: pctOrDash(r.falseInterception.rate),
+      verdict: "成对观察，不设单向 KPI",
+      state:
+        r.falseInterception.rate == null
+          ? "watch"
+          : r.falseInterception.rate > 0.1
+            ? "breach"
+            : "ok",
+      basis: `复核 ${r.falseInterception.reviewed} 条 / 待复核 ${r.falseInterception.pending} 条`,
+    },
+    {
+      incentive: "可信解决率",
+      incentiveValue: pctOrDash(board.trustedResolutionRate),
+      gaming: "放松防线",
+      guardrail: "漏放率（幻觉样例穿防）",
+      guardrailValue:
+        board.binding.cards === 0 ? "—" : board.binding.violatingCards + " 张破口卡",
+      verdict: "漏放 > 0 即 P0",
+      state:
+        board.binding.cards === 0
+          ? "watch"
+          : board.binding.violatingCards > 0
+            ? "breach"
+            : "ok",
+      basis: `审计 ${board.binding.cards} 张卡 / ${board.binding.citations} 个引用号，绑定率 ${pct(board.binding.bindingRate)}`,
+    },
+    {
+      incentive: "知识入库量",
+      // 「本周新增」和「全库累计」必须同时给:单看 +0 会被读成「知识库空了」。
+      incentiveValue: `本周 +${board.knowledge.documents} 篇`,
+      gaming: "灌水入库",
+      guardrail: "金标回归通过率 + 引用核实合规率",
+      guardrailValue: `${pct(report.accuracy)} / ${pct(board.binding.bindingRate)}`,
+      verdict: "门禁制，非 KPI",
+      state: report.accuracy >= 0.9 && board.binding.bindingRate >= 1 ? "ok" : "breach",
+      basis:
+        `全库 ${board.knowledge.documentsTotal} 篇 / ${board.knowledge.chunksTotal} 段 · ` +
+        `本周门禁回滚 ${board.knowledge.rolledBackRuns} 批 · ` +
+        `候选已批 ${board.knowledge.candidatesApproved} 条、待审 ${board.knowledge.candidatesPending} 条 · ` +
+        `NovaBench ${report.passed}/${report.total}`,
+    },
+    {
+      incentive: "P95 延迟",
+      incentiveValue: msOrDash(board.latency.overall.p95),
+      gaming: "省防线 / 降模型",
+      guardrail: "防线通过率结构 + NovaBench 得分",
+      guardrailValue: `${defenceStructure} · ${pct(report.accuracy)}`,
+      verdict: "优化延迟不得以防线为代价",
+      state:
+        board.latency.overall.samples === 0
+          ? "watch"
+          : report.accuracy >= 0.9
+            ? "ok"
+            : "breach",
+      basis:
+        board.latency.overall.samples === 0
+          ? "尚无延迟样本（发起一次咨询即开始采样）"
+          : `${board.latency.overall.samples} 条样本 · P50 ${msOrDash(board.latency.overall.p50)}`,
+    },
+    {
+      incentive: "用户负反馈率",
+      incentiveValue: pctOrDash(board.feedback.negativeRate),
+      gaming: "负向选择偏误致系统性高估不满",
+      guardrail: "隐式采纳率",
+      guardrailValue:
+        board.adoption.cards === 0 ? "—" : pct(board.adoption.adoptionRate),
+      verdict: "成对解读，不单独设 KPI",
+      state: board.adoption.cards === 0 ? "watch" : "ok",
+      basis:
+        `显式反馈 ${board.feedback.total} 条 · 采纳 ${board.adoption.adoptedCards}/${board.adoption.cards} 张卡` +
+        `（复制 ${board.adoption.byAction.copy} / 导出 ${board.adoption.byAction.export} / 同步 ${board.adoption.byAction.sync}）`,
+    },
+  ];
+}
 
 interface GateRow {
   key: string;
@@ -243,10 +452,12 @@ export function OperationsDashboard({
   initialReport,
   initialHistory,
   initialEvents,
+  guardrail,
 }: {
   initialReport: GateReport;
   initialHistory: BenchHistoryEntry[];
   initialEvents: QualityEvent[];
+  guardrail: GuardrailBoardView;
 }) {
   const [report, setReport] = useState<GateReport>(initialReport);
   const [latestReport, setLatestReport] = useState<GateReport>(initialReport);
@@ -266,6 +477,7 @@ export function OperationsDashboard({
   const openEvents = events.filter((e) => e.status === "open");
   const resolvedEvents = events.filter((e) => e.status === "resolved");
   const blocked = degraded.size > 0 || report.decision !== "proceed";
+  const pairs = useMemo(() => guardrailPairs(guardrail, report), [guardrail, report]);
 
   async function runBench() {
     setRunning(true);
@@ -482,6 +694,142 @@ export function OperationsDashboard({
             )}
           </article>
         ))}
+      </section>
+
+      {/* ══ 指标体系 v1.1 第 10 节:护栏对看板 ═══════════════════════════
+          每个激励指标与它的护栏指标同框。上面那一排 metric-card 是门禁快照,
+          这一段才是「这些数字可不可以当结论用」的判定依据。 */}
+      <section className="guardrail-board">
+        <div className="panel-heading">
+          <div>
+            <span className="eyebrow">GUARDRAIL PAIRS · 指标体系 v1.1 §10</span>
+            <h2>激励指标与护栏指标成对</h2>
+          </div>
+          <span className="candidate-id">
+            {guardrail.since ? "本自然周 · " + guardrail.since.slice(0, 10) : "全量窗口"} ·
+            会话 {guardrail.sessions.sessions} 次
+          </span>
+        </div>
+
+        <p className="guardrail-intro">
+          单独看激励指标可以被优化出好看的数字，所以这张板上没有任何一个激励指标是单独出现的。
+          护栏侧显示 <b>—</b> 表示该护栏还没有样本 —— 此时左边那个数<b>不能当结论用</b>。
+        </p>
+
+        {guardrail.p0.length > 0 && (
+          <div className="guardrail-alert p0">
+            <Siren size={14} />
+            <div>
+              <strong>P0 · 质量事件 + 冻结发版（第 11 节）</strong>
+              {guardrail.p0.map((r) => (
+                <small key={r}>{r}</small>
+              ))}
+            </div>
+          </div>
+        )}
+        {guardrail.p1.length > 0 && (
+          <div className="guardrail-alert p1">
+            <CircleAlert size={14} />
+            <div>
+              <strong>P1 · 纳入周会复盘（第 11 节）</strong>
+              {guardrail.p1.map((r) => (
+                <small key={r}>{r}</small>
+              ))}
+            </div>
+          </div>
+        )}
+        {guardrail.pendingReview > 0 && (
+          <div className="guardrail-alert watch">
+            <Activity size={14} />
+            <div>
+              <strong>欠复核 {guardrail.pendingReview} 条</strong>
+              <small>
+                误拦截率 / 该转未转率的唯一真值来源是专家复核。队列积压时这两格显示 —— 而不是
+                0%：还没人复核过，和复核了都对，是两件事。
+              </small>
+            </div>
+          </div>
+        )}
+
+        <div className="pair-table" role="table" aria-label="激励指标与护栏指标对照">
+          <div className="pair-row pair-head" role="row">
+            <span role="columnheader">激励指标</span>
+            <span role="columnheader">游戏化路径</span>
+            <span role="columnheader">护栏指标</span>
+            <span role="columnheader">判定</span>
+          </div>
+          {pairs.map((p) => (
+            <div key={p.incentive} className={"pair-row state-" + p.state} role="row">
+              <span className="pair-cell incentive" role="cell">
+                <em>{p.incentive}</em>
+                <strong>{p.incentiveValue}</strong>
+              </span>
+              <span className="pair-cell gaming" role="cell">
+                <ArrowDownRight size={12} />
+                {p.gaming}
+              </span>
+              <span className="pair-cell guardrail" role="cell">
+                <em>
+                  {p.state === "breach" ? (
+                    <CircleAlert size={11} className="pair-icon breach" />
+                  ) : p.state === "watch" ? (
+                    <Activity size={11} className="pair-icon watch" />
+                  ) : (
+                    <Check size={11} className="pair-icon ok" />
+                  )}
+                  {p.guardrail}
+                </em>
+                <strong>{p.guardrailValue}</strong>
+                <small>{p.basis}</small>
+              </span>
+              <span className="pair-cell verdict" role="cell">
+                {p.verdict}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="pair-footnotes">
+          <p>
+            <b>隐式采纳率口径边界（第 4.4 节）：</b>
+            复制也可能是「复制去质疑」，所以它<b>只做体验对冲指标，不进可信解决率计算链</b>。
+            代码层面也是这样落的：可信解决率的分子只认独立引用审计，与 adoption_events 无关。
+          </p>
+          <p>
+            <b>judge–专家一致率（第 5.1 节）：</b>
+            {guardrail.review.judgeAgreement.rate == null
+              ? "尚无两侧都判过的样本（judge 由离线任务 npm run review:judge 写入）。"
+              : pct(guardrail.review.judgeAgreement.rate) +
+                `（比对 ${guardrail.review.judgeAgreement.compared} 条）`}
+            {" "}judge 只做预筛，终审权在专家；judge 判定一条都不进误拦截率与该转未转率。
+          </p>
+          <p>
+            <b>修订回流率（埋点 C）：</b>
+            {pct(guardrail.inflow.inflowRate)}（办结 {guardrail.inflow.closures} 单，产出候选{" "}
+            {guardrail.inflow.withCandidate} 条）。
+            {guardrail.inflow.noCandidateReasons.length > 0 && (
+              <>
+                {" "}未产出理由：
+                {guardrail.inflow.noCandidateReasons
+                  .map((x) => `${x.reason}×${x.count}`)
+                  .join("、")}
+                。回流率低本身不是问题，理由清一色是「没时间」才是问题。
+              </>
+            )}
+          </p>
+          {guardrail.latency.byStatus.length > 0 && (
+            <p>
+              <b>延迟按处置分组：</b>
+              {guardrail.latency.byStatus
+                .map(
+                  (g) =>
+                    `${g.status} P95 ${msOrDash(g.stats.p95)}（${g.stats.samples} 条）`,
+                )
+                .join(" · ")}
+              。只看全局 P95 分不出「真的变快了」和「把该转专家的直接答掉了」。
+            </p>
+          )}
+        </div>
       </section>
 
       <section className="bench-history">

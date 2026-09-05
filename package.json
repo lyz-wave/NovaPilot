@@ -1,6 +1,6 @@
 {
   "name": "novapilot",
-  "version": "3.0.0",
+  "version": "3.2.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -8,11 +8,17 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "model:fetch": "node scripts/fetch-embedding-model.mjs",
+    "model:backfill": "vite-node -c vitest.config.ts scripts/backfill-semantic.ts",
+    "model:smoke": "node scripts/smoke-semantic.mjs",
+    "kb:ingest": "vite-node -c vitest.config.ts scripts/ingest-documents.ts",
+    "review:judge": "vite-node -c vitest.config.ts scripts/judge-review-samples.ts"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
     "next": "^15.4.4",
+    "onnxruntime-web": "1.26.0-dev.20260416-b7804b056c",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "zod": "^3.24.1"
@@ -25,6 +31,7 @@
     "playwright": "^1.61.1",
     "postcss": "^8.5.19",
     "typescript": "^5.7.2",
+    "vite-node": "^2.1.9",
     "vitest": "^2.1.8"
   },
   "overrides": {

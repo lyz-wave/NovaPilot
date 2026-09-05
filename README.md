@@ -55,25 +55,33 @@ NovaPilot is an AI-powered service system for **scientific research customer sup
 
 ## Architecture Highlights
 
-- **Deterministic orchestration state machine** (LangGraph replacement) — every node writes a DB checkpoint; runs are inspectable and replayable.
+- **Deterministic orchestration state machine** — a zero-dependency implementation of the stateful-graph model popularized by LangGraph (we do not depend on it); every node writes a DB checkpoint, so runs are inspectable and replayable.
 - **Actor–Critic dual agents with a rule-authority critic** — the model only writes prose; titles, citations and boundaries are rule-derived, so hallucinated citations are impossible.
 - **Three-layer grounding defense** — retrieval grounding → rule verification → semantic review; any layer can reject a recommendation. After three failed retrieval rounds the system escalates with a full reasoning chain instead of fabricating an answer.
+- **Two-stage hybrid retrieval** — SQLite FTS5 (trigram) candidate generation → BM25 + dense-vector fusion → rerank. The dense channel runs a bundled `bge-small-zh-v1.5` (ONNX int8) on a pure-WASM backend with zero native binaries; if the model is absent the whole search **degrades wholesale** to the deterministic hash embedding and retrieval never breaks.
 - **NovaGuard trust-control layer** — evidence whitelist ("answer only with evidence"), risk-tiered approval ("escalate when needed"), and a write contract (401/403/412/428).
+- **Version-controlled knowledge ingestion** — `data/knowledge/*.md` (frontmatter validated by zod) is ingested via `npm run kb:ingest` **behind the NovaBench gold-set regression gate**: a `stop` verdict rolls the entire batch back in one SQLite transaction, so knowledge that fails regression leaves not a single chunk behind.
+- **Guardrail-paired observability** — five instrumentation points (citation reverse-audit, interception/non-escalation review sampling, case-closure inflow, implicit adoption, end-to-end latency) make every incentive metric on the operations dashboard carry a guardrail metric **at the type level**, computed from one query over one time window.
 - **Scientific Decision Card** as the primary artifact — formal / provisional / needs-conditions / expert-review state machine (ADR-0004).
-- **Offline determinism is a hard invariant** — no API key, end-to-end deterministic run; 145 unit tests and 14 Playwright acceptance scripts are all reproducible offline.
+- **Offline operation is a hard invariant** — no API key, end-to-end offline run; 363 unit tests and 14 Playwright acceptance scripts are all reproducible offline. The dense retrieval channel is **deterministically degradable** (`NP_DISABLE_SEMANTIC=1` restores bit-for-bit determinism across the whole chain); everything else is unconditionally deterministic.
 
 ## Tech Stack
 
 - **Frontend**: Next.js 15 (App Router), React 19, TypeScript, zod, lucide-react
 - **Backend**: Next.js API routes, Node built-in `node:sqlite` (zero native deps), domain-driven design
-- **AI**: OpenAI-compatible model gateway (Doubao Ark / Claude / self-hosted) with offline deterministic fallback
-- **Testing**: Vitest (145 tests) + Playwright (14 E2E acceptance scripts, `.xxx-check.cjs`)
+- **AI**: OpenAI-compatible model gateway (Doubao Ark / Claude / self-hosted) with offline deterministic fallback; semantic embeddings via `onnxruntime-web`'s pure-WASM backend (no native bindings — one artifact for all three platforms)
+- **Testing**: Vitest (363 tests) + Playwright (14 E2E acceptance scripts, `.xxx-check.cjs`)
 
 ## Getting Started
 
     npm install
+    npm run model:fetch        # fetch the embedding model (23 MB, once; prebuilt bundles ship it)
     npm run build
     PORT=3210 npm start
+
+> `model:fetch` is the only step that needs network access, and it is **optional** — skip it and
+> retrieval falls back to the deterministic hash embedding. Everything still works; only recall on
+> paraphrased questions degrades (see `docs/B2-语义向量验收记录.md`).
 
 Open in browser:
 
@@ -86,9 +94,21 @@ Open in browser:
 
 ### Verify
 
-    npm test            # 145 unit tests
+    npm test            # 363 unit tests
     npm run typecheck   # tsc --noEmit
     npm run build       # production build
+    npm run model:smoke # semantic smoke test (proves this machine can infer offline)
+
+### Knowledge base & operations
+
+    npm run kb:ingest              # ingest data/knowledge/*.md; commits only if the gold-set gate passes
+    npm run kb:ingest -- --dry-run # parse and chunk only, no writes
+    npm run model:backfill         # fill in 512-dim vectors for chunks that lack them
+    npm run review:judge           # run the LLM first-pass judge over the pending review queue
+
+> The bundled knowledge base is **15 documents / 54 chunks** (7 seed + 8 SOPs under `data/knowledge/`).
+> Ingestion is idempotent (delete-old-then-reinsert by doc id), so re-runs do not inflate the index.
+> See `docs/B3-知识摄取验收记录.md`.
 
 ### E2E acceptance scripts (local, port 3210)
 
@@ -106,16 +126,22 @@ Scripts: capability · streaming · align · composer · pin · role-lens · fac
       server/
         orchestration/         Deterministic graph + checkpoints
         agents/                Actor-Critic, intent, model gateway
-        rag/                   Hybrid retrieval, seed knowledge, case memory
-        guards/                NovaGuard release gates
+        rag/                   Hybrid retrieval, seed knowledge, case memory, ingestion pipeline
+        guards/                NovaGuard release gates, citation reverse-audit
+        telemetry/             Five instrumentation points + guardrail-pair board definitions
         eval/                  NovaBench gold set, governed promotion
         db/                    SQLite schema + repositories
         feishu/                Feishu integration modules (credential-gated)
+    data/
+      knowledge/               Version-controlled knowledge source (8 SOPs, zod-validated frontmatter)
     docs/
       adr/                     13 Architecture Decision Records
       feishu/                  Feishu integration guide + Miaoda recipes
     deliverables/              Competition docs (outlines, PDFs, architecture SVGs)
     docs/前端优化说明.md              Frontend optimization changelog (9.1–9.15)
+    docs/B1-检索升级验收记录.md        FTS5 Chinese full-text search
+    docs/B2-语义向量验收记录.md        Real semantic vectors (pure WASM)
+    docs/B3-知识摄取验收记录.md        Ingestion pipeline + instrumentation + guardrail board
 
 ## ADR Highlights
 

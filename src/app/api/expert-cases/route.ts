@@ -9,6 +9,7 @@ import {
   updateExpertCase,
 } from "@/server/db/repositories";
 import { createCandidateKnowledge } from "@/domain/consultation-journey";
+import { recordCaseClosure } from "@/server/telemetry/case-closure";
 
 // Node runtime required for node:sqlite (not available on the edge runtime).
 export const runtime = "nodejs";
@@ -25,6 +26,9 @@ const bodySchema = z.discriminatedUnion("action", [
     caseId: z.string().min(1),
     amendment: z.string().min(1),
     createCandidate: z.boolean().optional(),
+    // 埋点 C:未产出候选知识时必填原因。schema 不在这里做条件必填(留给
+    // recordCaseClosure 统一判定),否则同一条规则会有两处实现、两处口径。
+    noCandidateReason: z.string().max(500).optional(),
     // 专家在证据审查中最终采用的证据(排除项不在此列)。缺省回退到
     // 演示固定的两条证据,保持既有行为。
     evidenceIds: z.array(z.string().min(1)).max(12).optional(),
@@ -79,6 +83,13 @@ export async function POST(request: Request) {
   }
 
   // action === "approve"
+  // 埋点 C 的必填校验放在**任何写入之前**:如果先把案例置为 resolved 再发现理由
+  // 没填而返回 400,案例已经办结但办结记录没落 —— 那一条会永远缺在回流率的分母
+  // 里,且没人知道它缺了。宁可整个请求原地失败,让专家补一句话重试。
+  if (!body.createCandidate && !(body.noCandidateReason ?? "").trim()) {
+    return NextResponse.json({ error: "NO_CANDIDATE_REASON_REQUIRED" }, { status: 400 });
+  }
+
   const record = updateExpertCase(db, {
     id: body.caseId,
     status: "resolved",
@@ -101,5 +112,17 @@ export async function POST(request: Request) {
     });
     saveCandidate(db, candidate, now);
   }
+  // 埋点 C:办结即落一条记录,产出与未产出都落 —— 只记「产出了」的那些会让
+  // 回流率的分母消失,分子当分母用永远是 100%。
+  recordCaseClosure(db, {
+    caseId: body.caseId,
+    projectId: record?.projectId ?? "",
+    owner: "expert-desk",
+    resolution: body.amendment,
+    producedCandidate: !!body.createCandidate,
+    candidateId: candidate?.id ?? null,
+    noCandidateReason: body.noCandidateReason,
+    now,
+  });
   return NextResponse.json({ case: record, candidate }, { headers });
 }

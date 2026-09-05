@@ -5,7 +5,7 @@
 import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { SCHEMA_SQL, SCHEMA_VERSION } from "./schema";
+import { SCHEMA_SQL, SCHEMA_VERSION, FTS_BACKFILL_SQL, ADDITIVE_COLUMNS } from "./schema";
 
 // Load the `node:sqlite` builtin through createRequire so bundlers (Vite/
 // Next/Turbopack) don't try to statically resolve it — some toolchains strip
@@ -18,6 +18,15 @@ export type NovaDb = InstanceType<typeof DatabaseSync>;
 /** Apply the (idempotent) schema and stamp the schema version. */
 export function migrate(db: NovaDb): void {
   db.exec(SCHEMA_SQL);
+  // `CREATE TABLE IF NOT EXISTS` 不会给已存在的表补列,所以新增列要单独 ALTER。
+  // 放在 SCHEMA_SQL 之后、回填之前:先把表结构补齐,再灌数据。
+  for (const { table, column, ddl } of ADDITIVE_COLUMNS) {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name?: unknown }>;
+    if (!cols.some((c) => c.name === column)) db.exec(ddl);
+  }
+  // 老库(schema v1)升上来时 chunks_fts 是空的:触发器只管新写入,存量 chunk
+  // 必须补一次,否则 FTS 预筛在升级后的库上召回为空、全部走回退路径。
+  db.exec(FTS_BACKFILL_SQL);
   db.prepare(
     "INSERT INTO schema_meta(key, value) VALUES('schema_version', ?) " +
       "ON CONFLICT(key) DO UPDATE SET value = excluded.value",

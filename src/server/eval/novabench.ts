@@ -26,6 +26,7 @@ import type { NovaDb } from "../db/client";
 import { ensureSeeded } from "../service";
 import { runConsultationGraph } from "../orchestration/graph";
 import { saveEvalRun } from "../db/repositories";
+import { auditCitations } from "../guards/citation-audit";
 import type { ModelGatewayConfig } from "../agents/model-gateway";
 
 export type GoldCategory = "formal" | "clarify" | "escalate" | "provisional";
@@ -177,18 +178,13 @@ export async function runNovaBench(
       );
       // Independently re-validate every cited evidence id: it must be present
       // in this run's retrieved evidence, verified, and not expired.
-      const evidenceById = new Map(r.evidence.map((e) => [e.id, e]));
-      const invalidCitations: string[] = [];
-      let citations = 0;
-      for (const rec of r.card.recommendations) {
-        for (const id of rec.evidenceIds) {
-          citations++;
-          const ev = evidenceById.get(id);
-          if (!ev || ev.validation !== "verified" || ev.validUntil < today) {
-            invalidCitations.push(`${rec.id}:${id}`);
-          }
-        }
-      }
+      // 用的是埋点 A 那把同一把尺子(guards/citation-audit),而不是这里再写一遍
+      // —— 两条路径口径必须一致,否则「金标回归 100%」和「看板绑定率 98%」谁对?
+      const audit = auditCitations(r.card, r.evidence, today);
+      const citations = audit.total;
+      const invalidCitations = audit.violations.map(
+        (v) => `${v.recommendationId}:${v.citation}`,
+      );
       const actual = classify(r.card.status);
       cases.push({
         id: gold.id,

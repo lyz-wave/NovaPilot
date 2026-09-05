@@ -101,7 +101,7 @@
     <text x="155" y="545" text-anchor="middle" class="whiteText">可人工介入</text>
 
     <rect x="275" y="405" width="500" height="118" rx="18" fill="url(#navyGrad)"/>
-    <text x="525" y="438" text-anchor="middle" class="whiteTitle">有状态科研服务中枢｜LangGraph</text>
+    <text x="525" y="438" text-anchor="middle" class="whiteTitle">有状态科研服务中枢｜确定性图编排</text>
     <text x="315" y="468" class="whiteText">意图路由</text>
     <text x="435" y="468" class="whiteText">项目记忆</text>
     <text x="555" y="468" class="whiteText">任务计划</text>

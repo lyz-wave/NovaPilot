@@ -1291,6 +1291,8 @@
   .decision-title-row { margin-top: 12px; }
   .decision-title-row h2 { font-family: var(--serif); font-size: clamp(20px, 1.7vw, 24px); font-weight: 600; letter-spacing: -.03em; line-height: 1.15; }
   .decision-title-row p { color: var(--ink-faint); font-family: var(--mono); font-size: 10px; margin-top: 5px; }
+  /* 复制 + 导出两个图标按钮。flex-shrink: 0 防止长标题把按钮挤扁到不可点。 */
+  .card-head-actions { display: flex; flex-shrink: 0; gap: 6px; }
   .card-status {
     align-items: center;
     background: var(--teal-soft);
@@ -1788,10 +1790,85 @@
     width: 100%;
   }
   .expert-decision textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(20, 87, 217, .14); outline: 0; }
-  .decision-controls { align-items: center; display: flex; gap: 12px; justify-content: space-between; margin-top: 12px; }
+  .decision-controls { align-items: center; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; margin-top: 12px; }
   .decision-controls label { align-items: center; color: var(--ink-soft); display: flex; font-size: 11px; gap: 8px; }
   .decision-controls input[type="checkbox"] { accent-color: var(--blue); height: 15px; width: 15px; }
   .decision-controls > div { display: flex; gap: 8px; }
+  /* 埋点 C 的必填原因:整行独占一格(flex-basis 100%),不跟按钮抢宽度 —— 一个
+     被挤成 80px 的必填输入框只会让人乱填一个字。order 保证它排在按钮之前。 */
+  .no-candidate-reason { align-items: stretch !important; flex-basis: 100%; flex-direction: column; gap: 5px !important; order: -1; }
+  .no-candidate-reason span { color: var(--amber); font-size: 10.5px; letter-spacing: .02em; }
+  .no-candidate-reason input[type="text"] {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 11.5px;
+    padding: 7px 9px;
+    width: 100%;
+  }
+  .no-candidate-reason input[type="text"]:focus-visible { border-color: var(--blue); outline: none; }
+
+  /* ── 埋点 B · 抽样复核面板(专家台) ──────────────────────────── */
+  .review-queue { border: 1px solid var(--line); border-radius: var(--r-md); margin-top: 16px; overflow: hidden; }
+  .review-queue-head {
+    align-items: center;
+    background: var(--surface-2);
+    border: none;
+    color: var(--ink);
+    cursor: pointer;
+    display: flex;
+    font-family: inherit;
+    font-size: 12px;
+    gap: 9px;
+    padding: 11px 14px;
+    text-align: left;
+    width: 100%;
+  }
+  .review-queue-head span { background: var(--surface); border-radius: var(--r-pill); color: var(--ink-soft); font-family: var(--mono); font-size: 10px; padding: 2px 8px; }
+  /* 三个率挤到右侧;min-width 0 + 省略号,窄屏下不把标题顶掉。 */
+  .review-queue-head em { color: var(--ink-faint); font-size: 10.5px; font-style: normal; margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .review-queue-body { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px 14px; }
+  .review-queue-note { color: var(--ink-faint); font-size: 10.5px; line-height: 1.6; }
+  .review-queue-error { align-items: center; color: var(--red); display: flex; font-size: 11px; gap: 5px; }
+  .review-sample { background: var(--surface-2); border: 1px solid var(--line); border-left-width: 3px; border-radius: var(--r-sm); display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; }
+  /* 左边框区分两类样本:漏转类(未转)是危险的那一类,给警示色。 */
+  .review-sample.kind-intercepted { border-left-color: var(--blue); }
+  .review-sample.kind-not-escalated { border-left-color: var(--amber); }
+  .review-sample header { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; }
+  .review-kind { color: var(--ink-soft); font-size: 10.5px; font-weight: 600; }
+  .review-sample code { color: var(--ink-faint); font-family: var(--mono); font-size: 10px; }
+  .judge-hint { background: var(--surface); border-radius: var(--r-pill); color: var(--ink-faint); font-size: 10px; font-style: normal; margin-left: auto; padding: 2px 8px; }
+  .review-question { font-size: 12px; line-height: 1.55; }
+  .review-meta { color: var(--ink-faint); font-family: var(--mono); font-size: 10px; }
+  .review-note { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); color: var(--ink); font-family: inherit; font-size: 11px; padding: 6px 8px; }
+  .review-note:focus-visible { border-color: var(--blue); outline: none; }
+  .review-actions { display: flex; gap: 8px; }
+  .review-actions button {
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    color: var(--ink);
+    cursor: pointer;
+    display: flex;
+    flex: 1;
+    font-family: inherit;
+    font-size: 11px;
+    gap: 5px;
+    justify-content: center;
+    padding: 7px 9px;
+    transition: border-color var(--fast), background var(--fast);
+  }
+  .review-actions button:hover:not(:disabled) { border-color: var(--ink-faint); }
+  .review-actions button:disabled { cursor: default; opacity: .55; }
+  .review-actions .verdict-wrong { border-color: var(--amber-soft); color: var(--amber); }
+  .review-summary { display: grid; gap: 10px; grid-template-columns: repeat(3, 1fr); margin-top: 2px; }
+  .review-summary div { background: var(--surface-2); border-radius: var(--r-sm); padding: 9px 11px; }
+  .review-summary dt { color: var(--ink-faint); font-size: 10px; }
+  .review-summary dd { color: var(--ink); font-family: var(--mono); font-size: 16px; margin-top: 3px; }
+  .review-summary dd small { color: var(--ink-faint); display: block; font-family: inherit; font-size: 9.5px; margin-top: 2px; }
 
   /* ── 运营评测 ───────────────────────────────────────────────── */
   .metric-grid { display: grid; gap: 14px; grid-template-columns: repeat(4, 1fr); margin: 0 auto 16px; max-width: 1500px; }
@@ -1820,8 +1897,42 @@
   .sparkline { align-items: flex-end; bottom: 0; display: flex; gap: 4px; height: 46px; left: 0; opacity: .6; padding: 0 18px; position: absolute; right: 0; }
   .sparkline i { background: linear-gradient(var(--blue), rgba(20, 87, 217, .08)); border-radius: 3px 3px 0 0; flex: 1; min-width: 3px; }
   .sparkline-empty { align-items: center; bottom: 0; color: var(--ink-faint); display: flex; font-family: var(--mono); font-size: 9px; height: 46px; left: 0; padding: 0 18px; position: absolute; right: 0; }
-  .bench-history { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); margin: 0 auto 16px; max-width: 1500px; padding: 18px 24px; }
-  .history-strip { display: flex; gap: 8px; list-style: none; margin-top: 12px; overflow-x: auto; padding-bottom: 4px; }
+  /* ── 指标体系 v1.1 §10 · 护栏对看板 ─────────────────────────────
+     四列网格:激励 / 游戏化路径 / 护栏 / 判定。护栏列刻意最宽 ——
+     它要同时放指标名、数值和样本量说明,而样本量不明的率不能当结论用。
+     左侧色条按 state 变色,是这张板上唯一的颜色语义:红=破口,琥珀=欠观测。 */
+  .guardrail-board { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); margin: 0 auto 16px; max-width: 1500px; padding: 18px 24px 20px; }
+  .guardrail-intro { color: var(--ink-faint); font-size: 11px; line-height: 1.7; margin-top: 10px; }
+  .guardrail-intro b { color: var(--ink); }
+  .guardrail-alert { align-items: flex-start; border-radius: var(--r-sm); display: flex; gap: 8px; margin-top: 10px; padding: 9px 12px; }
+  .guardrail-alert div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .guardrail-alert strong { font-size: 11px; letter-spacing: .01em; }
+  .guardrail-alert small { font-size: 10.5px; line-height: 1.65; }
+  .guardrail-alert.p0 { background: var(--red-soft); border: 1px solid var(--red); color: var(--red); }
+  .guardrail-alert.p1 { background: var(--amber-soft); border: 1px solid var(--amber); color: var(--amber); }
+  .guardrail-alert.watch { background: var(--surface-2); border: 1px dashed var(--line-dark); color: var(--ink-soft); }
+  .pair-table { border: 1px solid var(--line); border-radius: var(--r-sm); margin-top: 14px; overflow: hidden; }
+  .pair-row { border-top: 1px solid var(--line); display: grid; gap: 12px; grid-template-columns: 1.05fr .85fr 1.5fr 1.1fr; padding: 11px 14px; }
+  .pair-row:first-child { border-top: none; }
+  .pair-head { background: var(--surface-2); color: var(--ink-faint); font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+  .pair-row.state-breach { border-left: 3px solid var(--red); }
+  .pair-row.state-watch { border-left: 3px solid var(--amber); }
+  .pair-row.state-ok { border-left: 3px solid var(--teal); }
+  .pair-cell { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .pair-cell em { align-items: center; color: var(--ink-soft); display: flex; font-size: 10.5px; font-style: normal; gap: 4px; }
+  .pair-cell strong { font-family: var(--mono); font-size: 15px; letter-spacing: -.01em; }
+  .pair-cell small { color: var(--ink-faint); font-size: 10px; line-height: 1.55; }
+  .pair-cell.gaming { align-items: center; color: var(--amber); flex-direction: row; font-size: 10.5px; gap: 4px; line-height: 1.5; }
+  .pair-cell.guardrail strong { font-size: 13.5px; }
+  .pair-cell.verdict { color: var(--ink-faint); font-size: 10.5px; justify-content: center; line-height: 1.6; }
+  .pair-icon.breach { color: var(--red); }
+  .pair-icon.watch { color: var(--amber); }
+  .pair-icon.ok { color: var(--teal); }
+  .pair-footnotes { border-top: 1px dashed var(--line); display: flex; flex-direction: column; gap: 7px; margin-top: 14px; padding-top: 12px; }
+  .pair-footnotes p { color: var(--ink-faint); font-size: 10.5px; line-height: 1.7; }
+  .pair-footnotes b { color: var(--ink-soft); }
+
+  .bench-history { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); margin: 0 auto 16px; max-width: 1500px; padding: 18px 24px; }  .history-strip { display: flex; gap: 8px; list-style: none; margin-top: 12px; overflow-x: auto; padding-bottom: 4px; }
   .history-strip button { align-items: center; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm); color: var(--ink-faint); display: flex; flex-direction: column; font-size: 9.5px; gap: 3px; min-width: 96px; padding: 8px 10px; transition-property: border-color, background-color; transition-duration: var(--fast); transition-timing-function: ease-out; }
   .history-strip button:hover { border-color: var(--navy); }
   .history-strip button.active { background: var(--navy); border-color: var(--navy); color: #fff; }
@@ -2614,7 +2725,17 @@
     .decision-controls { align-items: flex-start; flex-direction: column; gap: 12px; }
     .decision-controls > div { width: 100%; }
     .decision-controls button { flex: 1; }
+    /* 三格指标在窄屏挤成 60px 宽会把「已复核 3 · 欠复核 12」折成四行。 */
+    .review-summary { grid-template-columns: 1fr; }
+    .review-queue-head { flex-wrap: wrap; }
+    .review-queue-head em { margin-left: 0; width: 100%; white-space: normal; }
     .resolve-form { grid-template-columns: 1fr; }
+    /* 护栏对在窄屏改成上下堆叠,但顺序不变:激励 → 游戏化路径 → 护栏 → 判定。
+       让护栏跑到激励上面会读反因果;把判定藏起来会让这一行失去约束力。
+       表头在单列布局下没有对齐意义,隐藏它,每格自己带标签(em/small)。 */
+    .pair-row { grid-template-columns: 1fr; gap: 8px; }
+    .pair-head { display: none; }
+    .pair-cell.verdict { border-top: 1px dashed var(--line); justify-content: flex-start; padding-top: 7px; }
     .case-head, .case-row { grid-template-columns: 1fr .7fr .7fr .5fr; }
     .case-row small { display: none; }
   }

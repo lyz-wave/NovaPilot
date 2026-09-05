@@ -31,10 +31,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install & build
-        run: |
-          npm ci
-          npm run build
+      - name: Install
+        run: npm ci
+      # B2:语义模型是 24MB 二进制,不进仓库(见 .gitignore),打包时现拉。
+      # 拉不下来就直接失败 —— 免安装包必须自带模型,否则用户断网时只能降级到
+      # 哈希向量,「离线可用真实语义检索」这条卖点就不成立了。
+      - name: Fetch embedding model
+        run: npm run model:fetch
+      - name: Verify degradation + semantic tests
+        run: npx vitest run src/server/rag/semantic.test.ts src/server/rag/wordpiece.test.ts
+      - name: Build
+        run: npm run build
       - name: Prepare portable Node runtime
         shell: bash
         run: |
@@ -57,6 +64,17 @@ jobs:
           cp -R .next pkg/app/
           cp -R node_modules pkg/app/
           cp -R src pkg/app/
+          cp -R scripts pkg/app/ 2>/dev/null || true
+          # B3:知识文档目录必须进包。ensureSeeded() 首次种库时会摄取它,评委打开
+          # 就是 15 篇知识;缺了它只剩 7 篇内置种子,召回覆盖面直接缩水一半。
+          cp -R data pkg/app/
+          test "$(ls pkg/app/data/knowledge/*.md | wc -l)" -ge 8 \
+            || { echo "知识文档没进包"; exit 1; }
+          # B2:模型目录必须进包。缺了它应用还能起(降级到哈希向量),但那不是
+          # 我们要交付的形态,所以这里硬校验。
+          cp -R models pkg/app/
+          test -f "pkg/app/models/bge-small-zh-v1.5/onnx/model_quantized.onnx" \
+            || { echo "模型没进包"; exit 1; }
           cp package.json package-lock.json next.config.ts tsconfig.json vitest.config.ts next-env.d.ts pkg/app/ 2>/dev/null || true
           cp -R docs pkg/app/ 2>/dev/null || true
           cp -R screenshots pkg/app/ 2>/dev/null || true
@@ -84,6 +102,21 @@ jobs:
           runtime\node.exe node_modules\next\dist\bin\next start
           pause
           EOF
+      # ── B2 双保险 ──
+      # 上面的 vitest 用的是 CI 自带的 Node;这里换成**打进包里的那个便携 Node**,
+      # 读**打进包里的**模型字节和 .wasm,真跑一次推理。三平台各跑一次,任一平台
+      # 的 WASM 后端有问题都会在发版前暴露,而不是等评委在自己机器上打开。
+      - name: Semantic smoke test (packaged runtime)
+        shell: bash
+        working-directory: pkg/app
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            NODE_BIN="./runtime/node.exe"
+          else
+            NODE_BIN="./runtime/bin/node"
+          fi
+          "$NODE_BIN" --version
+          "$NODE_BIN" scripts/smoke-semantic.mjs --text 测试
       - name: Archive package
         shell: bash
         run: |
@@ -94,6 +127,10 @@ jobs:
             zip -r -q "../NovaPilot-portable-${{ matrix.label }}.zip" .
           fi
           cd ..
+          # 记录体积增量口径:模型约 23 MB,压缩后基本不缩(ONNX 已是量化二进制)。
+          # 发版时对着上一版对比这两个数,增量明显偏离就说明打包内容出了变化。
+          echo "── 体积 ──"
+          du -sm app/models || true
           ls -la *.zip
       - name: Attach to GitHub Release
         uses: softprops/action-gh-release@v2

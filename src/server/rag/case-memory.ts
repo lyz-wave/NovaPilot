@@ -23,7 +23,14 @@ export interface SimilarCase {
   status: string;
   outcome: string;
   score: number;
+  /**
+   * `resolved`(真实办结的咨询)还是 `cold-start`(随包发布的样例)。
+   * 前端据此加「待 Coach 复核」标注 —— 样例不能冒充历史战绩。
+   */
+  provenance: CaseProvenance;
 }
+
+export type CaseProvenance = "resolved" | "cold-start";
 
 /** Compact one-line digest of the confirmed facts (for the memory + prompt). */
 export function factsDigest(facts: ProjectFacts): string {
@@ -51,17 +58,20 @@ export function recordCaseMemory(
     status: string;
     outcome: string;
     now: string;
+    /** 缺省 `resolved`。冷启动种子显式传 `cold-start`。 */
+    provenance?: CaseProvenance;
   },
 ): void {
   const surface = `${m.question} ${factsDigest(m.facts)} ${m.outcome}`;
   db.prepare(
-    `INSERT INTO case_memory(id, project_id, tenant_id, question, scenario, facts_digest, status, outcome, tokens, embedding, created_at)
-     VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO case_memory(id, project_id, tenant_id, question, scenario, facts_digest, status, outcome, tokens, embedding, provenance, created_at)
+     VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        question = excluded.question, scenario = excluded.scenario,
        facts_digest = excluded.facts_digest, status = excluded.status,
        outcome = excluded.outcome, tokens = excluded.tokens,
-       embedding = excluded.embedding, created_at = excluded.created_at`,
+       embedding = excluded.embedding, provenance = excluded.provenance,
+       created_at = excluded.created_at`,
   ).run(
     m.projectId,
     m.projectId,
@@ -73,6 +83,7 @@ export function recordCaseMemory(
     m.outcome,
     JSON.stringify(tokenize(surface)),
     JSON.stringify(embed(surface)),
+    m.provenance ?? "resolved",
     m.now,
   );
 }
@@ -86,6 +97,7 @@ interface CaseRow {
   outcome: string;
   tokens: string;
   embedding: string;
+  provenance: string | null;
 }
 
 /**
@@ -93,6 +105,11 @@ interface CaseRow {
  * current project so a re-run of the same consultation never "recalls itself".
  * Returns [] when the memory is empty (the common case in tests / eval), so the
  * whole layer is a safe no-op there.
+ *
+ * 只召回**已得出结论**的案例:formal(正式)、provisional(条件可行)、
+ * expert-review(转专家)。转专家是一个真实结论 —— 「这类样本我们上次就是转专家的」
+ * 恰恰是最值得召回的先例,只放能过的例子会把系统教成过度乐观(见 seed-cases.ts)。
+ * `needs-conditions` 排除在外:那是还在等用户补信息的半成品,不是先例。
  */
 export function searchSimilarCases(
   db: NovaDb,
@@ -110,9 +127,9 @@ export function searchSimilarCases(
   const rows = queryAll<CaseRow>(
     db,
     `SELECT project_id AS projectId, question, scenario, facts_digest AS factsDigest,
-            status, outcome, tokens, embedding
+            status, outcome, tokens, embedding, provenance
      FROM case_memory
-     WHERE tenant_id = ? AND status IN ('formal', 'provisional')`,
+     WHERE tenant_id = ? AND status IN ('formal', 'provisional', 'expert-review')`,
     input.tenantId,
   ).filter((r) => r.projectId !== input.excludeProjectId);
   if (rows.length === 0) return [];
@@ -161,6 +178,8 @@ export function searchSimilarCases(
       status: s.r.status,
       outcome: s.r.outcome,
       score: 0.5 * (s.bm25 / maxBm) + 0.5 * (s.vector / maxVec),
+      // 老库(schema < 5)里这一列是 NULL —— 那些行都是真实办结产生的。
+      provenance: (s.r.provenance === "cold-start" ? "cold-start" : "resolved") as CaseProvenance,
     }))
     .filter((c) => c.score >= minScore)
     .sort((a, b) => b.score - a.score)

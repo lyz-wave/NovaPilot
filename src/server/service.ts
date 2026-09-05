@@ -15,7 +15,9 @@ import {
   writeCompactState,
   type StoredModelConfig,
 } from "./db/repositories";
-import { chunkCount, seedKnowledgeBase } from "./rag/retrieval";
+import { chunkCount } from "./rag/retrieval";
+import { seedKnowledgeWithIngestion } from "./rag/ingest";
+import { seedColdStartCases } from "./rag/seed-cases";
 import { applyDoubaoEnvProfile } from "./feishu/doubao";
 import { estimateTokens } from "./rag/text";
 import {
@@ -106,7 +108,11 @@ function buildHistory(db: NovaDb, conversationId: string): ChatMessage[] {
 
 /** Ensure the knowledge base is seeded (idempotent, cheap when already loaded). */
 export function ensureSeeded(db: NovaDb): void {
-  if (chunkCount(db) === 0) seedKnowledgeBase(db);
+  // 内置种子库 + data/knowledge/ 摄取。免安装包里 data/knowledge 随包发布,
+  // 所以评委首次打开就能拿到全部 15 篇,不需要先跑 npm run kb:ingest。
+  if (chunkCount(db) === 0) seedKnowledgeWithIngestion(db);
+  // B3-4:相似案例的冷启动样例。自身幂等,且库里一旦有真实办结记录就自动跳过。
+  seedColdStartCases(db);
   // 企业豆包(火山方舟)环境变量自动注册模型 profile;缺 key 时 no-op。
   applyDoubaoEnvProfile(db);
 }
