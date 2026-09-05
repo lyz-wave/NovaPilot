@@ -415,9 +415,46 @@ CREATE TABLE IF NOT EXISTS latency_samples (
   created_at   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_latency_samples_created ON latency_samples(created_at);
+
+-- ── 检索日志(服务第 6 节「检索侧」四项 + 第 11 节 P2 告警路径) ─────
+-- 这些数原本「有」但取不出来:每轮检索的诊断确实写进了 checkpoints.state 的
+-- JSON,可 checkpoints 的主键是 (trace_id, node) 且 ON CONFLICT DO UPDATE ——
+-- 一次咨询最多三轮加深检索,后一轮把前一轮**原地覆盖**掉。看板要的
+-- 「短查询回退触发率」分母是**轮次**不是会话,靠聚合 checkpoints 绕不过去。
+-- 所以单开一张按轮次寻址的表(id = RL-<traceId>-<round>)。
+--
+-- 为什么不给「分值过阈」留一列:rerank 的融合分在**每次查询内部**做了
+-- max 归一化(retrieval.ts 里 bm25/maxBm),最高命中的 bm 恒为 1.0,于是
+-- top rerank 恒 ≥ 0.22,和这次检索到底准不准无关。拿它设阈值是自欺欺人。
+-- 「知识盲区」因此改用一个真信号:该轮检索出的证据**有没有撑住核验** ——
+-- 由 review 节点回填 verified,末轮 verified = 0 才算盲区。
+CREATE TABLE IF NOT EXISTS retrieval_logs (
+  id                  TEXT PRIMARY KEY,   -- RL-<traceId>-<round>
+  trace_id            TEXT NOT NULL,
+  project_id          TEXT NOT NULL,
+  round               INTEGER NOT NULL,
+  query               TEXT NOT NULL,
+  query_chars         INTEGER NOT NULL,   -- 短查询回退的自变量,单独存便于分桶
+  scope_hint          TEXT NOT NULL DEFAULT '',  -- 主题维度:知识盲区按它归组
+  top_k               INTEGER NOT NULL,
+  channel             TEXT NOT NULL,      -- fts | fallback
+  fallback_reason     TEXT,               -- channel = fts 时为 NULL
+  vector_space        TEXT NOT NULL,      -- semantic | hash
+  vector_space_reason TEXT,               -- vector_space = semantic 时为 NULL
+  candidate_count     INTEGER NOT NULL,
+  hit_count           INTEGER NOT NULL,
+  hit_doc_ids         TEXT NOT NULL DEFAULT '[]',  -- JSON string[](去重后的文档 id)
+  elapsed_ms          INTEGER NOT NULL,
+  -- 回填字段:检索发生在起草之前,本轮证据是否撑住核验要等 review 节点才知道。
+  -- NULL 表示还没回填(流程中断/异常),不能当 0 用 —— 会把中断算成盲区。
+  verified            INTEGER,
+  created_at          TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_retrieval_logs_created ON retrieval_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_retrieval_logs_trace ON retrieval_logs(trace_id, round);
 `;
 
-export const SCHEMA_VERSION = "7";
+export const SCHEMA_VERSION = "8";
 
 /**
  * 存量库回填:FTS 表是 schema v2 新增的,老库里 chunks 已有数据但

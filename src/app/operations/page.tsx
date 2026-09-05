@@ -13,6 +13,7 @@ import {
   pendingReviewLoad,
   weekStart,
 } from "@/server/telemetry/guardrail-board";
+import { p2Breaches, retrievalBoard } from "@/server/telemetry/retrieval-log";
 
 // Node runtime (node:sqlite) + always run the gold set at request time so the
 // dashboard opens on the real, current release-gate state.
@@ -53,10 +54,14 @@ export default async function OperationsPage() {
   // 看板窗口和复盘窗口对不上的话,会上讨论的数和板上显示的数不是同一批。
   // 六对共用同一个 sinceIso:护栏侧和激励侧不能来自两个时间窗,否则「成对」只是排版。
   const board = guardrailBoard(db, weekStart(new Date().toISOString()));
+  // 检索侧共用同一个窗口:P2 里的「SOP 覆盖率」若和护栏对不同窗,周会上没法对账。
+  const retrieval = retrievalBoard(db, weekStart(new Date().toISOString()));
   const guardrail: GuardrailBoardView = {
     ...board,
+    retrieval,
     p0: p0Breaches(board),
     p1: p1Breaches(board),
+    p2: p2Breaches(retrieval),
     pendingReview: pendingReviewLoad(board),
   };
   return (

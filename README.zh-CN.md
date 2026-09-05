@@ -49,7 +49,9 @@ NovaPilot 是面向**科研客户技术支持与咨询**的 AI 智能服务体�
 
 ## 架构亮点
 
-- **确定性编排状态机**(参考 LangGraph 有状态图模型的零依赖实现,不依赖该框架):每节点落 DB checkpoint,可审计可重放。
+- **确定性编排状态机**(参考 LangGraph 有状态图模型的零依赖实现,默认路径不依赖该框架):每节点落 DB checkpoint,可审计可重放。
+  接地循环那一段还可以用 `NP_ORCHESTRATOR=langgraph` 切到**真实的 `@langchain/langgraph` `StateGraph`** ——
+  两条路径复用同一组节点函数,对拍测试保证换编排器不改变答案;该包在 `optionalDependencies` 里,装不上就自动回退。
 - **Actor–Critic 双智能体 + 规则终审**:模型只写散文,标题/引用/边界由规则派生,幻觉引用不可能通过。
 - **三层证据接地防线**:检索接地 → 规则核验 → 语义复核,任何一层可拒绝推荐;三轮无证据即携完整论证链转专家,绝不硬编。
 - **两段式混合检索**:SQLite FTS5(trigram)候选生成 → BM25 + 稠密向量融合 → rerank。稠密通道用内置的
@@ -57,10 +59,11 @@ NovaPilot 是面向**科研客户技术支持与咨询**的 AI 智能服务体�
 - **NovaGuard 可信控制**:证据白名单(有据才答)、风险分级审批(该转就转)、写契约(401/403/412/428)。
 - **可版本管理的知识摄取管线**:`data/knowledge/*.md`(frontmatter 由 zod 校验)经 `npm run kb:ingest` 入库,
   **挂在 NovaBench 金标回归门禁上** —— 门禁 `stop` 就整批 SQLite ROLLBACK,没通过的知识一个 chunk 都不留。
-- **护栏对可观测性**:五处埋点(引用号反查审计 / 拦截与未转复核抽样 / 案例闭环入流 / 隐式采纳 / 端到端延迟)
-  让运营看板的每个激励指标都**在类型层面**必须配一个护栏指标,同源同窗成对出数。
+- **护栏对可观测性**:六处埋点(引用号反查审计 / 拦截与未转复核抽样 / 案例闭环入流 / 隐式采纳 / 端到端延迟 / 逐轮检索日志)
+  让运营看板的每个激励指标都**在类型层面**必须配一个护栏指标,同源同窗成对出数。检索日志按 `(traceId, round)` 单独落表,
+  因为 `checkpoints` 的主键会把三轮加深检索压成一行,轮次口径的回退率从那里算不出来。
 - **科学决策卡**核心工件:formal / provisional / needs-conditions / expert-review 四态状态机(ADR-0004)。
-- **离线运行是硬不变式**:363 个单测 + 14 个 Playwright 验收脚本全部可离线复现。检索的稠密通道**可确定性降级**
+- **离线运行是硬不变式**:377 个单测 + 14 个 Playwright 验收脚本全部可离线复现。检索的稠密通道**可确定性降级**
   (`NP_DISABLE_SEMANTIC=1` 即回到全链路逐位确定性),其余环节无条件确定。
 
 ## 技术栈
@@ -69,7 +72,7 @@ NovaPilot 是面向**科研客户技术支持与咨询**的 AI 智能服务体�
 - **后端**:Next.js API Routes、Node 内置 `node:sqlite`(零原生依赖)、领域驱动设计
 - **AI**:OpenAI 兼容模型网关(豆包火山方舟 / Claude / 自建)带离线确定性回退;
   语义嵌入用 `onnxruntime-web` 纯 WASM 后端(无原生绑定,三平台同一份产物)
-- **测试**:Vitest(363 个单测)+ Playwright(14 个 E2E 验收脚本)
+- **测试**:Vitest(377 个单测)+ Playwright(14 个 E2E 验收脚本)
 
 ## 快速开始
 
@@ -92,7 +95,7 @@ NovaPilot 是面向**科研客户技术支持与咨询**的 AI 智能服务体�
 
 ### 质量验证
 
-    npm test            # 363 个单测
+    npm test            # 377 个单测
     npm run typecheck   # tsc --noEmit
     npm run build       # 生产构建
     npm run model:smoke # 语义向量烟雾测试(验证本机 WASM 后端可离线推理)
@@ -122,11 +125,11 @@ expert · knowledge · operations · click-audit · smoke,每个脚本输出 PAS
       components/              UI 组件
       domain/                  领域模型与核心逻辑 + 测试
       server/
-        orchestration/         确定性编排图 + checkpoint
+        orchestration/         确定性编排图 + checkpoint;接地循环可选 LangGraph 适配器
         agents/                Actor-Critic、意图分类、模型网关
         rag/                   混合检索、种子知识、案例记忆、知识摄取管线
         guards/                NovaGuard 发布门禁、引用号反查审计
-        telemetry/             五处埋点(复核抽样 / 案例闭环 / 采纳 / 延迟)+ 护栏对看板口径
+        telemetry/             六处埋点(复核抽样 / 案例闭环 / 采纳 / 延迟 / 逐轮检索日志)+ 护栏对看板口径
         eval/                  NovaBench 金标集、受治理晋级
         db/                    SQLite schema 与仓储
         feishu/                飞书集成模块(凭证门控)
@@ -140,6 +143,8 @@ expert · knowledge · operations · click-audit · smoke,每个脚本输出 PAS
     docs/B1-检索升级验收记录.md        FTS5 中文全文检索
     docs/B2-语义向量验收记录.md        真实语义向量(纯 WASM)
     docs/B3-知识摄取验收记录.md        知识摄取管线 + 五处埋点 + 护栏对看板
+    docs/B4-检索日志与可选LangGraph编排验收记录.md
+                                      逐轮检索日志(P2 告警)+ 可选 LangGraph 编排
 
 ## ADR 精选
 

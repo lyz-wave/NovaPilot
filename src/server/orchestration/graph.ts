@@ -36,13 +36,17 @@ import {
 import {
   backfillSemanticVectors,
   chunkCount,
-  searchWithDiagnostics,
-  type RetrievalDiagnostics,
   type RetrievedChunk,
 } from "../rag/retrieval";
 import { seedKnowledgeWithIngestion } from "../rag/ingest";
 import { auditCitations, recordCitationAudit } from "../guards/citation-audit";
 import { enqueueReviewSample } from "../telemetry/review-samples";
+import {
+  MAX_ROUNDS,
+  runGroundingLoop,
+  type ActorResult,
+  type CriticResult,
+} from "./grounding-loop";
 import { embedSemantic } from "../rag/semantic";
 import { syncDecisionCard } from "../feishu/bitable";
 import {
@@ -50,13 +54,7 @@ import {
   recordCaseMemory,
   type SimilarCase,
 } from "../rag/case-memory";
-import {
-  runActor,
-  runCritic,
-  deriveScopeHint,
-  broadenHint,
-  verifyGrounding,
-} from "../agents/actor-critic";
+import { deriveScopeHint } from "../agents/actor-critic";
 import { runNovaGuard } from "../guards/novaguard";
 import type { ChatMessage, ModelGatewayConfig } from "../agents/model-gateway";
 
@@ -161,9 +159,10 @@ const LOOP_EXHAUSTED_COPY: Record<Locale, string> = {
   ja: "検索と検証を複数回深掘りしても十分な根拠が得られなかったため、全推論過程と共に専門家へ引き継ぎました。",
 };
 
-// Grounding-loop round budget. Each failed round deepens retrieval (larger topK,
-// broader scope hint) before re-drafting and re-verifying.
-const MAX_ROUNDS = 3;
+// Grounding-loop round budget lives with the loop itself (grounding-loop.ts) so
+// both orchestrators share one definition; re-exported here for callers that
+// used to read it off this module.
+export { MAX_ROUNDS };
 
 /**
  * Run the consultation graph end-to-end. Persists project, facts, checkpoints,
@@ -242,101 +241,38 @@ export async function runConsultationGraph(
   });
 
   let chunks: RetrievedChunk[] = [];
-  let actor!: Awaited<ReturnType<typeof runActor>>;
-  let critic!: ReturnType<typeof runCritic>;
-  const loopTrace: Array<{
-    round: number;
-    hint: string | undefined;
-    topK: number;
-    drafted: number;
-    verified: number;
-    grounding: string;
-    dropped: number;
-    /** 本轮检索走的通道与向量空间(方案量化指标的检索侧数据源)。 */
-    retrieval: RetrievalDiagnostics;
-  }> = [];
+  let actor!: ActorResult;
+  let critic!: CriticResult;
 
   // 查询侧语义向量只算一次 —— 三轮加深检索用的是同一句查询文本,变的只有
   // hint 与 topK。模型不可用时为 null,检索自动退回哈希向量空间。
   const retrievalQuery = `${input.question} ${scenario}`;
   const semanticQueryVector = await embedSemantic(retrievalQuery);
 
-  for (let round = 0; round < MAX_ROUNDS; round++) {
-    const hint = broadenHint(baseHint, round);
-    const topK = 5 * 2 ** round; // 5 → 10 → 20
-
-    const retrieved = searchWithDiagnostics(db, retrievalQuery, {
-      appliesToHint: hint,
-      topK,
-      semanticQueryVector,
-    });
-    chunks = retrieved.hits;
-    visit("retrieve", {
-      round,
-      hint,
-      topK,
-      chunks: chunks.map((c) => c.chunkId),
-      similarCases: similarCases.map((c) => c.projectId),
-      // 落进 checkpoint:量化指标里的「短查询回退触发率」「检索 P95」与
-      // 「语义/哈希空间占比」全部从这里离线统计,不需要另建埋点表。
-      retrieval: retrieved.diagnostics,
-    });
-
-    actor = await runActor(
-      {
-        question: input.question,
-        locale: input.locale,
-        chunks,
-        appliesToHint: hint,
-        sensitive,
-        facts: input.facts,
-        history: input.history,
-        similarCases,
-      },
-      cfg,
-    );
-    visit("draft", { round, recommendations: actor.recommendations.map((r) => r.id) });
-
-    critic = runCritic({
-      recommendations: actor.recommendations,
-      chunks,
-      appliesToHint: hint,
-      now: input.now,
-    });
-
-    // Semantic re-grounding (no-op offline): drop any rule-verified recommendation
-    // whose evidence the model judges does not actually support the claim.
-    const grounding = await verifyGrounding(
-      { recommendations: critic.verified, chunks, question: input.question, locale: input.locale },
-      cfg,
-    );
-    critic = {
-      ...critic,
-      verified: grounding.verified,
-      approved: grounding.verified.length > 0 && grounding.dropped.length === 0 && critic.approved,
-    };
-
-    loopTrace.push({
-      round,
-      hint,
-      topK,
-      drafted: actor.recommendations.length,
-      verified: critic.verified.length,
-      grounding: grounding.provider,
-      dropped: grounding.dropped.length,
-      retrieval: retrieved.diagnostics,
-    });
-    visit("review", {
-      round,
-      approved: critic.approved,
-      verified: critic.verified.length,
-      findings: critic.findings,
-      loopTrace,
-    });
-
-    if (critic.verified.length > 0) break; // grounded → stop
-    if (blockedByConditions) break; // waiting on the customer → don't spin the loop
-  }
+  // 循环本体在 grounding-loop.ts:同一组节点函数,两种编排方式(原生 for 循环 /
+  // 真实 LangGraph StateGraph)。默认原生,`NP_ORCHESTRATOR=langgraph` 切换。
+  const loop = await runGroundingLoop({
+    db,
+    traceId: input.traceId,
+    projectId: input.projectId,
+    question: input.question,
+    locale: input.locale,
+    facts: input.facts,
+    history: input.history,
+    now: input.now,
+    baseHint,
+    blockedByConditions,
+    sensitive,
+    similarCases,
+    retrievalQuery,
+    semanticQueryVector,
+    cfg,
+    visit,
+  });
+  chunks = loop.chunks;
+  actor = loop.actor;
+  critic = loop.critic;
+  const loopTrace = loop.loopTrace;
 
   // ── risk-gate (NovaGuard): escalate or finalize ──
   // 风险分级审批收敛在 NovaGuard 可信控制层（ADR-0012）：低风险且证据充分 →

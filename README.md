@@ -55,22 +55,22 @@ NovaPilot is an AI-powered service system for **scientific research customer sup
 
 ## Architecture Highlights
 
-- **Deterministic orchestration state machine** — a zero-dependency implementation of the stateful-graph model popularized by LangGraph (we do not depend on it); every node writes a DB checkpoint, so runs are inspectable and replayable.
+- **Deterministic orchestration state machine** — a zero-dependency implementation of the stateful-graph model popularized by LangGraph (the default path does not depend on it); every node writes a DB checkpoint, so runs are inspectable and replayable. The grounding loop can additionally be driven by a **real `@langchain/langgraph` `StateGraph`** via `NP_ORCHESTRATOR=langgraph` — both paths reuse the same node functions, differential tests pin that swapping orchestrators cannot change the answer, and the package sits in `optionalDependencies` so a missing install silently falls back.
 - **Actor–Critic dual agents with a rule-authority critic** — the model only writes prose; titles, citations and boundaries are rule-derived, so hallucinated citations are impossible.
 - **Three-layer grounding defense** — retrieval grounding → rule verification → semantic review; any layer can reject a recommendation. After three failed retrieval rounds the system escalates with a full reasoning chain instead of fabricating an answer.
 - **Two-stage hybrid retrieval** — SQLite FTS5 (trigram) candidate generation → BM25 + dense-vector fusion → rerank. The dense channel runs a bundled `bge-small-zh-v1.5` (ONNX int8) on a pure-WASM backend with zero native binaries; if the model is absent the whole search **degrades wholesale** to the deterministic hash embedding and retrieval never breaks.
 - **NovaGuard trust-control layer** — evidence whitelist ("answer only with evidence"), risk-tiered approval ("escalate when needed"), and a write contract (401/403/412/428).
 - **Version-controlled knowledge ingestion** — `data/knowledge/*.md` (frontmatter validated by zod) is ingested via `npm run kb:ingest` **behind the NovaBench gold-set regression gate**: a `stop` verdict rolls the entire batch back in one SQLite transaction, so knowledge that fails regression leaves not a single chunk behind.
-- **Guardrail-paired observability** — five instrumentation points (citation reverse-audit, interception/non-escalation review sampling, case-closure inflow, implicit adoption, end-to-end latency) make every incentive metric on the operations dashboard carry a guardrail metric **at the type level**, computed from one query over one time window.
+- **Guardrail-paired observability** — six instrumentation points (citation reverse-audit, interception/non-escalation review sampling, case-closure inflow, implicit adoption, end-to-end latency, per-round retrieval logs) make every incentive metric on the operations dashboard carry a guardrail metric **at the type level**, computed from one query over one time window. Retrieval logs get their own table keyed by `(traceId, round)` because the `checkpoints` primary key collapses three deepening rounds into one row, making per-round fallback rates structurally uncomputable from there.
 - **Scientific Decision Card** as the primary artifact — formal / provisional / needs-conditions / expert-review state machine (ADR-0004).
-- **Offline operation is a hard invariant** — no API key, end-to-end offline run; 363 unit tests and 14 Playwright acceptance scripts are all reproducible offline. The dense retrieval channel is **deterministically degradable** (`NP_DISABLE_SEMANTIC=1` restores bit-for-bit determinism across the whole chain); everything else is unconditionally deterministic.
+- **Offline operation is a hard invariant** — no API key, end-to-end offline run; 377 unit tests and 14 Playwright acceptance scripts are all reproducible offline. The dense retrieval channel is **deterministically degradable** (`NP_DISABLE_SEMANTIC=1` restores bit-for-bit determinism across the whole chain); everything else is unconditionally deterministic.
 
 ## Tech Stack
 
 - **Frontend**: Next.js 15 (App Router), React 19, TypeScript, zod, lucide-react
 - **Backend**: Next.js API routes, Node built-in `node:sqlite` (zero native deps), domain-driven design
 - **AI**: OpenAI-compatible model gateway (Doubao Ark / Claude / self-hosted) with offline deterministic fallback; semantic embeddings via `onnxruntime-web`'s pure-WASM backend (no native bindings — one artifact for all three platforms)
-- **Testing**: Vitest (363 tests) + Playwright (14 E2E acceptance scripts, `.xxx-check.cjs`)
+- **Testing**: Vitest (377 tests) + Playwright (14 E2E acceptance scripts, `.xxx-check.cjs`)
 
 ## Getting Started
 
@@ -94,7 +94,7 @@ Open in browser:
 
 ### Verify
 
-    npm test            # 363 unit tests
+    npm test            # 377 unit tests
     npm run typecheck   # tsc --noEmit
     npm run build       # production build
     npm run model:smoke # semantic smoke test (proves this machine can infer offline)
@@ -124,11 +124,11 @@ Scripts: capability · streaming · align · composer · pin · role-lens · fac
       components/              UI components (workspace, thread, panels, dashboards)
       domain/                  Domain models, decision-card & knowledge-evolution logic + tests
       server/
-        orchestration/         Deterministic graph + checkpoints
+        orchestration/         Deterministic graph + checkpoints; optional LangGraph adapter for the grounding loop
         agents/                Actor-Critic, intent, model gateway
         rag/                   Hybrid retrieval, seed knowledge, case memory, ingestion pipeline
         guards/                NovaGuard release gates, citation reverse-audit
-        telemetry/             Five instrumentation points + guardrail-pair board definitions
+        telemetry/             Six instrumentation points + guardrail-pair board definitions
         eval/                  NovaBench gold set, governed promotion
         db/                    SQLite schema + repositories
         feishu/                Feishu integration modules (credential-gated)
@@ -142,6 +142,8 @@ Scripts: capability · streaming · align · composer · pin · role-lens · fac
     docs/B1-检索升级验收记录.md        FTS5 Chinese full-text search
     docs/B2-语义向量验收记录.md        Real semantic vectors (pure WASM)
     docs/B3-知识摄取验收记录.md        Ingestion pipeline + instrumentation + guardrail board
+    docs/B4-检索日志与可选LangGraph编排验收记录.md
+                                      Per-round retrieval logs (P2 alerts) + optional LangGraph orchestration
 
 ## ADR Highlights
 

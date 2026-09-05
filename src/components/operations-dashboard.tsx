@@ -156,8 +156,34 @@ export interface GuardrailBoardView {
     chunksTotal: number;
   };
   feedback: { total: number; negative: number; negativeRate: number | null };
+  /**
+   * 检索侧(指标体系 §6)。分母是**检索轮次**而不是会话 —— 一次咨询最多三轮
+   * 加深检索,按会话算会把回退率稀释到看不见。
+   */
+  retrieval: {
+    channels: {
+      rounds: number;
+      fts: number;
+      fallback: number;
+      fallbackReasons: Array<{ reason: string; rounds: number }>;
+      shortQueryRate: number | null;
+    };
+    vectorSpaces: {
+      rounds: number;
+      semantic: number;
+      hash: number;
+      semanticRate: number | null;
+      reasons: Array<{ reason: string; rounds: number }>;
+    };
+    elapsed: { rounds: number; p50: number | null; p95: number | null; max: number | null };
+    sopCoverage: { total: number; covered: number; rate: number | null };
+    neverHit: Array<{ documentId: string; title: string; source: string }>;
+    blindSpots: Array<{ topic: string; sessions: number; sampleQuery: string; lastAt: string }>;
+  };
   p0: string[];
   p1: string[];
+  /** P2 · 一周内处理(第 11 节)。样本不足时为空 —— 小样本告警会被训练成噪声。 */
+  p2: string[];
   pendingReview: number;
 }
 
@@ -209,6 +235,66 @@ interface PairRow {
  *  - watch:护栏指标没有样本(rate === null)—— 激励指标的数此刻不该被当成结论
  *  - ok:成对有数且未破
  */
+interface RetrievalRow {
+  metric: string;
+  basis: string;
+  value: string;
+  reading: string;
+}
+
+/**
+ * 检索侧四项 + 两项通道口径,逐行构造。
+ *
+ * 每行都写清楚**分母是什么**:这一段的分母是检索轮次,和护栏对那张表的会话
+ * 分母不同。没有样本一律显示 —— 与全板一致,「没测过」不能长得像「测过没问题」。
+ */
+function retrievalRows(r: GuardrailBoardView["retrieval"]): RetrievalRow[] {
+  const fallbackDetail = r.channels.fallbackReasons.length
+    ? r.channels.fallbackReasons.map((x) => `${x.reason}×${x.rounds}`).join("、")
+    : "无回退";
+  return [
+    {
+      metric: "短查询回退触发率",
+      basis: `fallbackReason = short-query 的轮次 / ${r.channels.rounds} 轮`,
+      value: pctOrDash(r.channels.shortQueryRate),
+      reading: "trigram 索引查不到 <3 字词元，回退全量扫描；持续偏高说明召回结构性变差",
+    },
+    {
+      metric: "回退通道分布",
+      basis: `FTS ${r.channels.fts} 轮 / 回退 ${r.channels.fallback} 轮`,
+      value: fallbackDetail,
+      reading: "「候选不足」和「查询太短」是两种病，合并计数就没法对症",
+    },
+    {
+      metric: "语义向量空间占比",
+      basis: `semantic ${r.vectorSpaces.semantic} / hash ${r.vectorSpaces.hash} 轮`,
+      value: pctOrDash(r.vectorSpaces.semanticRate),
+      reading:
+        r.vectorSpaces.reasons.length > 0
+          ? "降级原因：" + r.vectorSpaces.reasons.map((x) => `${x.reason}×${x.rounds}`).join("、")
+          : "语义模型缺失时整体降级到哈希向量，功能不断但召回下降",
+    },
+    {
+      metric: "SOP 覆盖率",
+      basis: `被命中过的 SOP ${r.sopCoverage.covered} / 库内 SOP ${r.sopCoverage.total} 篇`,
+      value: pctOrDash(r.sopCoverage.rate),
+      reading: "分母是知识库存量，不是检索轮次；从未命中的篇目要么冗余要么召回偏窄",
+    },
+    {
+      metric: "知识盲区主题数",
+      basis: "末轮检索证据零核验的会话，按 scope hint 归组",
+      value: String(r.blindSpots.length),
+      reading: "不用检索分值判定：rerank 在查询内部做了归一化，拿它设阈值恒为真",
+    },
+    {
+      metric: "检索段耗时 P95",
+      basis: `最近邻分位，不插值 · ${r.elapsed.rounds} 轮样本`,
+      value: msOrDash(r.elapsed.p95),
+      reading: "只覆盖检索一段，不能冒充端到端 P95",
+    },
+  ];
+}
+
 function guardrailPairs(board: GuardrailBoardView, report: GateReport): PairRow[] {
   const r = board.review;
   const defenceStructure =
@@ -829,6 +915,93 @@ export function OperationsDashboard({
               。只看全局 P95 分不出「真的变快了」和「把该转专家的直接答掉了」。
             </p>
           )}
+        </div>
+      </section>
+
+      {/* 检索侧口径(指标体系 §6)+ P2 告警路径(§11)。
+          单开一段而不是并进护栏对表:这里的分母是**检索轮次**,护栏对那张表的
+          分母是会话。两个分母混排在同一张表里,读表的人一定会横向比出错误结论。 */}
+      <section className="guardrail-board retrieval-board">
+        <div className="panel-heading">
+          <div>
+            <span className="eyebrow">RETRIEVAL · 指标体系 v1.1 §6 / §11 P2</span>
+            <h2>检索侧口径与知识盲区</h2>
+          </div>
+          <span className="candidate-id">
+            检索轮次 {guardrail.retrieval.channels.rounds} 轮 · 一次咨询最多 3 轮
+          </span>
+        </div>
+
+        <p className="guardrail-intro">
+          这一段的分母是<b>检索轮次</b>，不是会话。数据来自 <code>retrieval_logs</code>：
+          编排 checkpoint 的主键是 <code>(trace_id, node)</code>，三轮加深检索会互相覆盖，
+          按轮次的回退率在那边取不出来。
+        </p>
+
+        {guardrail.p2.length > 0 && (
+          <div className="guardrail-alert watch">
+            <Activity size={14} />
+            <div>
+              <strong>P2 · 一周内处理（第 11 节）</strong>
+              {guardrail.p2.map((r) => (
+                <small key={r}>{r}</small>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="pair-table" role="table" aria-label="检索侧口径">
+          <div className="pair-row pair-head" role="row">
+            <span role="columnheader">指标</span>
+            <span role="columnheader">口径</span>
+            <span role="columnheader">当前值</span>
+            <span role="columnheader">读法</span>
+          </div>
+          {retrievalRows(guardrail.retrieval).map((r) => (
+            <div key={r.metric} className="pair-row" role="row">
+              <span className="pair-cell incentive" role="cell">
+                <em>{r.metric}</em>
+              </span>
+              <span className="pair-cell gaming" role="cell">{r.basis}</span>
+              <span className="pair-cell guardrail" role="cell">
+                <strong>{r.value}</strong>
+              </span>
+              <span className="pair-cell verdict" role="cell">{r.reading}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="pair-footnotes">
+          {guardrail.retrieval.blindSpots.length > 0 ? (
+            <p>
+              <b>知识盲区（{guardrail.retrieval.blindSpots.length} 个主题）：</b>
+              {guardrail.retrieval.blindSpots
+                .map((s) => `${s.topic}（${s.sessions} 次，例：${s.sampleQuery}）`)
+                .join("；")}
+              。口径是<b>末轮</b>检索出的证据一条都没撑住核验 —— 前几轮检索不到是设计意图
+              （所以才加深），末轮还是零核验才叫盲区。
+            </p>
+          ) : (
+            <p>
+              <b>知识盲区：</b>暂无。注意这不等于「知识库很全」：判定只覆盖<b>已经有人问过</b>的
+              主题，没人问过的空白区这张表看不见。
+            </p>
+          )}
+          {guardrail.retrieval.neverHit.length > 0 && (
+            <p>
+              <b>从未被命中的文档（{guardrail.retrieval.neverHit.length} 篇）：</b>
+              {guardrail.retrieval.neverHit.slice(0, 6).map((d) => d.documentId).join("、")}
+              {guardrail.retrieval.neverHit.length > 6 && " …"}
+              。要么是冗余知识，要么是检索召回面偏窄 —— 这两种病的处理方式相反，需要人来判。
+            </p>
+          )}
+          <p>
+            <b>检索耗时口径：</b>这里的 P95 只覆盖<b>检索这一段</b>，
+            {guardrail.retrieval.elapsed.p95 == null
+              ? "尚无样本。"
+              : `当前 ${msOrDash(guardrail.retrieval.elapsed.p95)}。`}
+            端到端 P95 在上一段护栏对里，两者不能互相顶替 —— 用检索耗时冒充端到端是偷换口径。
+          </p>
         </div>
       </section>
 

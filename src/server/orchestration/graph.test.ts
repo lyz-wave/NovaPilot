@@ -167,4 +167,41 @@ describe("Stage 4 · consultation orchestration graph", () => {
     const stored = (db.prepare("SELECT COUNT(*) AS n FROM case_memory").get() as { n: number }).n;
     expect(stored).toBe(0);
   });
+
+  /**
+   * 检索日志按轮次落库,并由 review 节点回填核验数。
+   *
+   * 钉的是「日志行数 = 实际检索轮数」而不是「= 1」—— checkpoints 里
+   * (trace_id, node) 主键会把三轮压成一行,那正是单开这张表的理由。
+   */
+  it("每轮检索各落一行日志,且 verified 被回填(不是 NULL)", async () => {
+    const r = await runConsultationGraph(db, base({ projectId: "RL-1", traceId: "rl-1" }), OFF);
+    const rows = db
+      .prepare(
+        `SELECT round, channel, vector_space AS vectorSpace, hit_count AS hitCount,
+                hit_doc_ids AS hitDocIds, verified
+         FROM retrieval_logs WHERE trace_id = 'rl-1' ORDER BY round`,
+      )
+      .all() as Array<{
+      round: number;
+      channel: string;
+      vectorSpace: string;
+      hitCount: number;
+      hitDocIds: string;
+      verified: number | null;
+    }>;
+
+    // 这一例一轮就接地,所以恰好一行;轮次与 loopTrace 长度必须一致。
+    const rounds = (getCheckpoints(db, "rl-1").find((s) => s.node === "review")!.state as {
+      loopTrace: unknown[];
+    }).loopTrace.length;
+    expect(rows).toHaveLength(rounds);
+    expect(rows[0]!.round).toBe(0);
+    expect(rows[0]!.hitCount).toBeGreaterThan(0);
+    // 文档 id 去重后落库:命中数 ≥ 去重文档数。
+    expect(JSON.parse(rows[0]!.hitDocIds).length).toBeGreaterThan(0);
+    // 回填过 —— NULL 表示流程断在 review 之前,不能当 0 用。
+    expect(rows[0]!.verified).not.toBeNull();
+    expect(rows[0]!.verified).toBe(r.card.recommendations.length);
+  });
 });
