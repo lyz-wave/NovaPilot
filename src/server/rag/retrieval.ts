@@ -17,6 +17,7 @@ import { queryAll, type NovaDb } from "../db/client";
 import { tokenize, embed, cosine } from "./text";
 import { embedSemantic } from "./semantic";
 import { SEED_DOCS } from "./seed-knowledge";
+import { recordDegradeTrigger } from "../telemetry/degrade-matrix";
 
 export interface RetrievedChunk {
   chunkId: string;
@@ -273,7 +274,18 @@ function ftsCandidates(
   db: NovaDb,
   query: string,
 ): { rows: ChunkRow[]; reason: FallbackReason } {
-  if (ftsDisabled()) return { rows: [], reason: "disabled" };
+  if (ftsDisabled()) {
+    try {
+      recordDegradeTrigger(db, {
+        gateKey: "fts-disabled",
+        label: "FTS 逃生开关已打开",
+        source: "runtime",
+        deduped: false,
+        now: new Date().toISOString(),
+      });
+    } catch {}
+    return { rows: [], reason: "disabled" };
+  }
   const match = sanitizeFtsQuery(query);
   if (!match) return { rows: [], reason: "short-query" };
   try {
@@ -379,6 +391,15 @@ export function searchWithDiagnostics(
       vectorSpaceReason = null;
     } else {
       vectorSpaceReason = "candidates-not-backfilled";
+      try {
+        recordDegradeTrigger(db, {
+          gateKey: "semantic-hash-fallback",
+          label: "语义向量未回填，降级至哈希空间",
+          source: "runtime",
+          deduped: false,
+          now: new Date().toISOString(),
+        });
+      } catch {}
     }
   }
 

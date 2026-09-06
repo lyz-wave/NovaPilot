@@ -19,6 +19,7 @@ import {
   inferScenarioFromQuestion,
   type ConsultationResult,
   type DecisionCard,
+  type DefenseRecord,
   type Evidence,
   type Locale,
   type ProjectFacts,
@@ -62,6 +63,8 @@ import {
   describeScopeViolations,
 } from "../guards/scope-contract";
 import type { ChatMessage, ModelGatewayConfig } from "../agents/model-gateway";
+import { recordDegradeTrigger } from "../telemetry/degrade-matrix";
+import { finalizeReviewRounds } from "../telemetry/interception";
 
 export interface GraphInput {
   projectId: string;
@@ -79,6 +82,8 @@ export interface GraphInput {
    * eval/tests don't cross-contaminate; the live service turns it on.
    */
   recordMemory?: boolean;
+  /** When set and NP_STREAM_TOKENS=true, receives incremental token deltas from draftNode. */
+  onToken?: (delta: string) => void;
 }
 
 export type GraphNode =
@@ -104,6 +109,8 @@ export interface GraphResult extends ConsultationResult {
   scenario: Scenario;
   criticApproved: boolean;
   provider: string;
+  /** ms from draftNode call to first token; only set when NP_STREAM_TOKENS=true. */
+  firstTokenMs?: number;
 }
 
 function checkpoint(
@@ -194,6 +201,22 @@ export async function runConsultationGraph(
   const visit = (n: GraphNode, state: unknown) => {
     path.push(n);
     checkpoint(db, input.traceId, n, state, input.now);
+  };
+
+  // 注入 runtime 降级埋点：LLM 不可达时走 deterministic 路径，对应第 8 节 llm-offline 门。
+  const cfgWithDegrade: ModelGatewayConfig = {
+    ...cfg,
+    onDegrade: (reason) => {
+      try {
+        recordDegradeTrigger(db, {
+          gateKey: "llm-offline",
+          label: `LLM 降级 (${reason})`,
+          source: "runtime",
+          deduped: false,
+          now: input.now,
+        });
+      } catch {}
+    },
   };
 
   // 检索前确保知识库已就绪:无论先访问哪个页面(如专家工作台),交接包
@@ -291,8 +314,9 @@ export async function runConsultationGraph(
     similarCases,
     retrievalQuery,
     semanticQueryVector,
-    cfg,
+    cfg: cfgWithDegrade,
     visit,
+    onToken: input.onToken,
   });
   chunks = loop.chunks;
   actor = loop.actor;
@@ -315,6 +339,9 @@ export async function runConsultationGraph(
   const { meetsSopBoundary, mustEscalate, loopExhausted, outOfScope } = guard;
   const status = guard.decision;
   visit("risk-gate", guard.trace);
+
+  // 回填本轮所有 review_rounds 记录的最终结局，供拦截→解决转化率计算。
+  try { finalizeReviewRounds(db, input.traceId, status); } catch {}
 
   const evidence = chunks.map(chunkToEvidence);
   const recommendations: Recommendation[] =
@@ -393,6 +420,30 @@ export async function runConsultationGraph(
 
   let expertCase: GraphResult["expertCase"] = null;
   if (mustEscalate) {
+    const lastTrace = loopTrace[loopTrace.length - 1];
+    const defenseTrail: DefenseRecord[] = [
+      {
+        layer: "scope-contract",
+        verdict: outOfScope ? "blocked" : "passed",
+        detail: outOfScope ? describeScopeViolations(scopeViolations) : "适用范围内",
+      },
+      ...(!outOfScope
+        ? [
+            {
+              layer: "actor-critic" as const,
+              verdict: (critic.approved ? "passed" : "blocked") as "passed" | "blocked",
+              detail: lastTrace
+                ? `第${loopTrace.length}轮：${lastTrace.verified}条建议通过，${lastTrace.dropped}条被丢弃`
+                : "未进入检索循环",
+            },
+          ]
+        : []),
+      {
+        layer: "novaguard",
+        verdict: "blocked",
+        detail: guard.reasons.length > 0 ? guard.reasons.join("；") : `风险级别 ${risk.level}`,
+      },
+    ];
     expertCase = {
       id: `CASE-${input.projectId}`,
       status: "awaiting-claim",
@@ -402,7 +453,7 @@ export async function runConsultationGraph(
         confirmedFacts: input.facts,
         attemptedAction: outOfScope
           ? "适用范围契约检查判定越界，未进入证据检索"
-          : "完成多轮混合检索与科研 Reviewer 论证核验",
+          : `完成${loopTrace.length}轮混合检索与科研 Reviewer 论证核验`,
         riskLevel: risk.level,
         reason: outOfScope
           ? `越出适用范围/能力边界：${describeScopeViolations(scopeViolations)}`
@@ -414,6 +465,7 @@ export async function runConsultationGraph(
         evidenceConflict: scenario === "evidence-conflict",
         decisionsNeeded: card.pendingItems,
         evidence,
+        defenseTrail,
       },
     };
     saveExpertCase(db, input.projectId, expertCase, input.now);
@@ -505,6 +557,7 @@ export async function runConsultationGraph(
     scenario,
     criticApproved: critic.approved,
     provider: actor.provider,
+    firstTokenMs: loop.firstTokenMs,
   };
 }
 

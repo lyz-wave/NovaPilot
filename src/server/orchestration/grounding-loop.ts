@@ -28,6 +28,7 @@ import type { SimilarCase } from "../rag/case-memory";
 import { runActor, runCritic, broadenHint, verifyGrounding } from "../agents/actor-critic";
 import type { ChatMessage, ModelGatewayConfig } from "../agents/model-gateway";
 import { noteRoundVerified, recordRetrievalRound } from "../telemetry/retrieval-log";
+import { recordReviewRound } from "../telemetry/interception";
 
 /** 接地循环的轮次预算。每轮失败就放宽 hint、翻倍 topK 再来一次。 */
 export const MAX_ROUNDS = 3;
@@ -69,6 +70,8 @@ export interface LoopContext {
   cfg: ModelGatewayConfig;
   /** 落 checkpoint。两条编排路径写的是同一份轨迹。 */
   visit: (node: "retrieve" | "draft" | "review", state: unknown) => void;
+  /** When set and NP_STREAM_TOKENS=true, receives incremental token deltas from draftNode. */
+  onToken?: (delta: string) => void;
 }
 
 /** 循环的可变状态。LangGraph 侧把它当成 channel 的合集,原生侧当成闭包变量。 */
@@ -83,6 +86,8 @@ export interface LoopState {
   loopTrace: LoopTraceEntry[];
   /** review 节点算出来的「还要不要再来一轮」。条件边只读它,不重算。 */
   done: boolean;
+  /** ms from draftNode call to first token; only set when NP_STREAM_TOKENS=true. */
+  firstTokenMs?: number;
 }
 
 export function initialLoopState(): LoopState {
@@ -145,11 +150,14 @@ export async function draftNode(ctx: LoopContext, state: LoopState): Promise<Par
       facts: ctx.facts,
       history: ctx.history,
       similarCases: ctx.similarCases,
+      onToken: ctx.onToken,
     },
     ctx.cfg,
   );
   ctx.visit("draft", { round: state.round, recommendations: actor.recommendations.map((r) => r.id) });
-  return { actor };
+  // Carry first token latency from the first round only (subsequent rounds overwrite with undefined).
+  const firstTokenMs = state.firstTokenMs ?? actor.firstTokenMs;
+  return { actor, firstTokenMs };
 }
 
 export async function reviewNode(ctx: LoopContext, state: LoopState): Promise<Partial<LoopState>> {
@@ -202,6 +210,18 @@ export async function reviewNode(ctx: LoopContext, state: LoopState): Promise<Pa
     critic.verified.length > 0 || // grounded → stop
     ctx.blockedByConditions || // waiting on the customer → don't spin the loop
     state.round + 1 >= MAX_ROUNDS; // 轮次预算耗尽
+
+  // 每轮 critic 结果追加一条流水，供「拦截→解决转化率」计算分母。
+  try {
+    recordReviewRound(ctx.db, {
+      traceId: ctx.traceId,
+      round: state.round,
+      criticVerdict: critic.approved ? "approved" : "blocked",
+      droppedCount: grounding.dropped.length,
+      now: ctx.now,
+    });
+  } catch {}
+
   return { critic, loopTrace, done, round: state.round + 1 };
 }
 
@@ -217,6 +237,8 @@ export interface GroundingLoopResult {
   loopTrace: LoopTraceEntry[];
   /** 实际跑了几轮。对拍测试用它验证两条路径的环行为一致。 */
   rounds: number;
+  /** ms from first draftNode call to first token; only set when NP_STREAM_TOKENS=true. */
+  firstTokenMs?: number;
 }
 
 /** 原生实现:一个 for 循环。零依赖,默认路径。 */
@@ -234,6 +256,7 @@ export async function runGroundingLoopNative(ctx: LoopContext): Promise<Groundin
     critic: state.critic!,
     loopTrace: state.loopTrace,
     rounds: state.round,
+    firstTokenMs: state.firstTokenMs,
   };
 }
 

@@ -53,6 +53,8 @@ interface ConsultationThreadProps {
   factsConfirmed: boolean;
   /** 当前(可编辑)项目事实:场景条回填模板问题用。 */
   facts: ProjectFacts;
+  /** Incremental token text received when NP_STREAM_TOKENS=true (empty otherwise). */
+  liveTokens?: string;
 }
 
 const scenarios: Array<{ id: Scenario; label: string; hint: string; demo?: boolean }> = [
@@ -332,6 +334,7 @@ export function ConsultationThread({
   onRoleChange,
   factsConfirmed,
   facts,
+  liveTokens = "",
 }: ConsultationThreadProps) {
   const [prompt, setPrompt] = useState("");
   const [exampleIdx, setExampleIdx] = useState(0);
@@ -713,6 +716,10 @@ export function ConsultationThread({
               <div role="status" aria-live="polite">
                 <ThinkingBlock checkpoints={progress} done={false} />
               </div>
+              {/* Live token preview when NP_STREAM_TOKENS=true — shows partial draft before Actor-Critic completes. */}
+              {liveTokens && (
+                <StreamingText text={liveTokens} className="agent-summary live-tokens-preview" />
+              )}
             </div>
           </article>
         )}

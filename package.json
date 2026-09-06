@@ -16,7 +16,8 @@
     "kb:verify-citations": "vite-node -c vitest.config.ts scripts/verify-citations.ts",
     "review:judge": "vite-node -c vitest.config.ts scripts/judge-review-samples.ts",
     "demo:e2e": "node scripts/demo-e2e.mjs",
-    "inject:fault": "vite-node -c vitest.config.ts scripts/inject-fault.ts"
+    "inject:fault": "vite-node -c vitest.config.ts scripts/inject-fault.ts",
+    "blindspot:clusters": "vite-node -c vitest.config.ts scripts/blindspot-clusters.ts"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

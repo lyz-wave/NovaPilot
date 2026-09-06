@@ -42,7 +42,7 @@ describe("适用范围契约 · 分离度", () => {
     expect(manifest.declared).toContain("ffpe rna");
   });
 
-  it("19 条合法问题零假阳性", () => {
+  it("全部合法问题零假阳性（金标集 + LEGIT 列表）", () => {
     const flagged: string[] = [];
     for (const q of [...GOLD_CASES.map((g) => g.question), ...LEGIT]) {
       const v = checkScopeContract(q, manifest);
@@ -51,19 +51,42 @@ describe("适用范围契约 · 分离度", () => {
     expect(flagged).toEqual([]);
   });
 
-  it("8 条对抗样例逐条命中，且命中的是对的那一类", () => {
+  it("23 条 scope-detectable 对抗样例逐条命中，且命中的是对的那一类", () => {
+    // H-NUM-DV200-FLOOR 通过 DV200 阈值拦截（不是 scope-contract 层），不在此检测。
+    const SCOPE_DETECTABLE = new Set([
+      "H-OOD-SINGLECELL", "H-OOD-SPATIAL", "H-OOD-CHIPSEQ", "H-OOD-PROTEOMICS",
+      "H-OOD-AMPLICON", "H-OOD-WGBS",
+      "H-FAKE-SOP", "H-FAKE-PMID", "H-FAKE-DOI", "H-FAKE-INTERNAL",
+      "H-FAKE-PMID-OFFTOPIC", "H-FAKE-SOP2",
+      "H-NUM-PRICE", "H-NUM-REAGENT", "H-NUM-COVERAGE", "H-NUM-TIMELINE", "H-NUM-OPTIMAL-COUNT",
+      "H-SCOPE-SPECIES", "H-SCOPE-CLINICAL", "H-SCOPE-PLANT",
+      "H-SCOPE-NEWBORN-SCREEN", "H-SCOPE-DRUG", "H-SCOPE-MONKEY",
+    ]);
     const kinds = new Map(
-      HALLUCINATION_CASES.map((hc) => [hc.id, checkScopeContract(hc.question, manifest)]),
+      HALLUCINATION_CASES
+        .filter((hc) => SCOPE_DETECTABLE.has(hc.id))
+        .map((hc) => [hc.id, checkScopeContract(hc.question, manifest)]),
     );
     for (const [id, v] of kinds) expect(v.length, id).toBeGreaterThan(0);
+    // OOD assay violations
     expect(kinds.get("H-OOD-SINGLECELL")![0].kind).toBe("assay");
     expect(kinds.get("H-OOD-SPATIAL")![0].kind).toBe("assay");
+    expect(kinds.get("H-OOD-CHIPSEQ")!.some((v) => v.kind === "assay")).toBe(true);
+    expect(kinds.get("H-OOD-PROTEOMICS")!.some((v) => v.kind === "assay")).toBe(true);
+    // Fake citation violations
     expect(kinds.get("H-FAKE-SOP")!.some((v) => v.kind === "unknown-citation")).toBe(true);
     expect(kinds.get("H-FAKE-PMID")!.some((v) => v.kind === "unknown-citation")).toBe(true);
+    expect(kinds.get("H-FAKE-DOI")!.some((v) => v.kind === "unknown-citation")).toBe(true);
+    expect(kinds.get("H-FAKE-PMID-OFFTOPIC")!.some((v) => v.kind === "unknown-citation")).toBe(true);
+    // Capability violations
     expect(kinds.get("H-NUM-PRICE")!.some((v) => v.kind === "capability")).toBe(true);
     expect(kinds.get("H-NUM-REAGENT")!.some((v) => v.kind === "capability")).toBe(true);
-    expect(kinds.get("H-SCOPE-SPECIES")!.some((v) => v.kind === "species")).toBe(true);
     expect(kinds.get("H-SCOPE-CLINICAL")!.some((v) => v.kind === "capability")).toBe(true);
+    expect(kinds.get("H-SCOPE-DRUG")!.some((v) => v.kind === "capability")).toBe(true);
+    // Species violations
+    expect(kinds.get("H-SCOPE-SPECIES")!.some((v) => v.kind === "species")).toBe(true);
+    expect(kinds.get("H-SCOPE-PLANT")!.some((v) => v.kind === "species")).toBe(true);
+    expect(kinds.get("H-SCOPE-MONKEY")!.some((v) => v.kind === "species")).toBe(true);
   });
 });
 
@@ -102,8 +125,8 @@ describe("适用范围契约 · 判定口径", () => {
     expect(checkScopeContract("按 NV-SOP-RNA-042 执行对吗", manifest)).toEqual([]);
     // 省略 E- 前缀的写法也应认出来(库里存的是 E-SOP-MED-001)。
     expect(checkScopeContract("按 SOP-MED-001 的规格执行对吗", manifest)).toEqual([]);
-    // 真实 PMID 同理。
-    expect(checkScopeContract("PMID 35361992 是这个结论的依据吗", manifest)).toEqual([]);
+    // 真实 PMID 同理（W1 修正后的正确 PMID）。
+    expect(checkScopeContract("PMID 24637835 是这个结论的依据吗", manifest)).toEqual([]);
     const fake = checkScopeContract("按 SOP-FFPE-2099 第七章执行", manifest);
     expect(fake.map((v) => v.kind)).toEqual(["unknown-citation"]);
   });

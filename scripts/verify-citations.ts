@@ -39,7 +39,21 @@ function flag(name: string): boolean {
 const recheck = flag("recheck");
 const dbPath = process.env.NOVAPILOT_DB_PATH ?? resolve(process.cwd(), ".data/novapilot.db");
 
-async function verifyPmid(pmid: string): Promise<{ ok: boolean; note: string }> {
+/** Jaccard 词元相似度（小写化 + 空格切词）。用于标题一致性校验。 */
+function jaccardSimilarity(a: string, b: string): number {
+  const tokenize = (s: string) =>
+    new Set(s.toLowerCase().replace(/[^\w\s]/g, " ").split(/\s+/).filter(Boolean));
+  const setA = tokenize(a);
+  const setB = tokenize(b);
+  let intersection = 0;
+  for (const t of setA) if (setB.has(t)) intersection++;
+  const union = setA.size + setB.size - intersection;
+  return union === 0 ? 1 : intersection / union;
+}
+
+const JACCARD_THRESHOLD = 0.3;
+
+async function verifyPmid(pmid: string): Promise<{ ok: boolean; note: string; upstreamTitle?: string }> {
   try {
     const res = await fetch(
       `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=${encodeURIComponent(pmid)}&retmode=json`,
@@ -49,22 +63,23 @@ async function verifyPmid(pmid: string): Promise<{ ok: boolean; note: string }> 
     const data = (await res.json()) as { result?: Record<string, { title?: string; error?: string }> };
     const entry = data.result?.[pmid];
     if (!entry || entry.error) return { ok: false, note: "PubMed 找不到该 PMID" };
-    return { ok: true, note: `标题:${entry.title ?? "(无标题字段)"}` };
+    const upstreamTitle = entry.title ?? "";
+    return { ok: true, note: `标题:${upstreamTitle}`, upstreamTitle };
   } catch (err) {
     return { ok: false, note: `联网核实失败: ${err instanceof Error ? err.message : String(err)}` };
   }
 }
 
-async function verifyDoi(doi: string): Promise<{ ok: boolean; note: string }> {
+async function verifyDoi(doi: string): Promise<{ ok: boolean; note: string; upstreamTitle?: string }> {
   try {
     const res = await fetch(`https://api.crossref.org/works/${encodeURIComponent(doi)}`, {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (!res.ok) return { ok: false, note: `CrossRef 返回 HTTP ${res.status}` };
     const data = (await res.json()) as { message?: { title?: string[] } };
-    const title = data.message?.title?.[0];
-    if (!title) return { ok: false, note: "CrossRef 找不到该 DOI" };
-    return { ok: true, note: `标题:${title}` };
+    const upstreamTitle = data.message?.title?.[0];
+    if (!upstreamTitle) return { ok: false, note: "CrossRef 找不到该 DOI" };
+    return { ok: true, note: `标题:${upstreamTitle}`, upstreamTitle };
   } catch (err) {
     return { ok: false, note: `联网核实失败: ${err instanceof Error ? err.message : String(err)}` };
   }
@@ -75,8 +90,8 @@ async function main() {
   ensureSeeded(db);
 
   const docs = db
-    .prepare(`SELECT id, source, citation FROM documents WHERE source = 'SCI'`)
-    .all() as Array<{ id: string; source: string; citation: string }>;
+    .prepare(`SELECT id, source, citation, title FROM documents WHERE source = 'SCI'`)
+    .all() as Array<{ id: string; source: string; citation: string; title: string }>;
 
   const ledger: ProvenanceLedger = loadProvenanceLedger();
   const now = new Date().toISOString();
@@ -99,16 +114,32 @@ async function main() {
 
     checked++;
     const result = id.kind === "pmid" ? await verifyPmid(id.value) : await verifyDoi(id.value);
+
+    // 标题一致性校验（仅在接口返回成功且 upstreamTitle 存在时执行）
+    let status: ProvenanceEntry["status"] = result.ok ? "verified" : "unverified";
+    if (result.ok && result.upstreamTitle) {
+      const jaccard = jaccardSimilarity(doc.title ?? "", result.upstreamTitle);
+      if (jaccard < JACCARD_THRESHOLD) {
+        status = "title-mismatch";
+        console.warn(
+          `  ⚠ ${doc.id}(${key}) 标题不符(Jaccard=${jaccard.toFixed(2)} < ${JACCARD_THRESHOLD}):` +
+          `\n      本地: "${doc.title}"` +
+          `\n      上游: "${result.upstreamTitle}"`,
+        );
+      }
+    }
+
     const entry: ProvenanceEntry = {
       kind: id.kind,
       value: id.value,
-      status: result.ok ? "verified" : "unverified",
-      verifiedAt: result.ok ? now : null,
+      status,
+      verifiedAt: status === "verified" ? now : null,
       method: id.kind === "pmid" ? "PubMed E-utilities" : "CrossRef REST API",
       note: result.note,
+      ...(result.upstreamTitle ? { upstreamTitle: result.upstreamTitle } : {}),
     };
     ledger[key] = entry;
-    console.log(`  ${result.ok ? "✓" : "✗"} ${doc.id}(${key}): ${result.note}`);
+    console.log(`  ${status === "verified" ? "✓" : status === "title-mismatch" ? "⚠" : "✗"} ${doc.id}(${key}): ${result.note}`);
   }
 
   saveProvenanceLedger(ledger);

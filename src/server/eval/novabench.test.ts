@@ -113,23 +113,23 @@ describe("Stage 6 · NovaBench gold-set evaluation", () => {
 });
 
 describe("Stage 6 · NovaBench Hit Rate@5", () => {
-  it("报告带 hitRateAtK 字段,分母等于有 expectedDocId 的用例数", async () => {
+  it("报告带 hitRateAtK 字段,分母等于有 expectedDocIds 的用例数", async () => {
     const db = createDb(":memory:");
     const report = await runNovaBench(db, OFF);
 
-    // 分母:GOLD_CASES 里有 7 条标注了 expectedDocId(2 条无)。
-    const expectedTotal = GOLD_CASES.filter((g) => g.expectedDocId !== undefined).length;
-    expect(expectedTotal).toBeGreaterThan(0); // 防止全部 expectedDocId 被误删
+    // 分母:GOLD_CASES 里显式标注了 expectedDocIds 的用例数（30 条里有 5 条无）。
+    const expectedTotal = GOLD_CASES.filter((g) => g.expectedDocIds !== undefined).length;
+    expect(expectedTotal).toBeGreaterThan(0); // 防止全部 expectedDocIds 被误删
     expect(report.metrics.hitRateTotal).toBe(expectedTotal);
 
     // hitRateAtK 不应为 null(因为 hitRateTotal > 0)。
     expect(report.metrics.hitRateAtK).not.toBeNull();
     expect(typeof report.metrics.hitRateAtK).toBe("number");
 
-    // 逐条:标注了 expectedDocId 的用例 hitAtK 不是 null,没标注的是 null。
+    // 逐条:标注了 expectedDocIds 的用例 hitAtK 不是 null,没标注的是 null。
     for (const c of report.cases) {
       const gold = GOLD_CASES.find((g) => g.id === c.id)!;
-      if (gold.expectedDocId !== undefined) {
+      if (gold.expectedDocIds !== undefined) {
         expect(c.hitAtK).not.toBeNull();
         expect(typeof c.hitAtK).toBe("boolean");
       } else {
@@ -156,7 +156,7 @@ describe("Stage 6 · NovaBench 漏放率接入", () => {
     const db = createDb(":memory:");
     const report = await runNovaBench(db);
 
-    // 分母跟着走:看板与自评一律「0 / 8」连着显示,不允许只显示一个 0。
+    // 分母跟着走:看板与自评一律「0 / 24」连着显示,不允许只显示一个 0。
     expect(report.metrics.hallucinationTotal).toBe(report.hallucination.total);
     expect(report.metrics.hallucinationTotal).toBeGreaterThan(0);
     expect(report.metrics.hallucinationLeaks).toBe(report.hallucination.leaked);

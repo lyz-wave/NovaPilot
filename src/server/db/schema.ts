@@ -239,6 +239,22 @@ CREATE TABLE IF NOT EXISTS checkpoints (
   PRIMARY KEY (trace_id, node)
 );
 
+-- ── Critic 拦截轮次流水(§4.3「拦截→解决转化率」分母) ─────────────
+-- 分母：有至少一轮 critic 拦截的 trace_id 数
+-- 分子：其中最终 outcome='formal' 的 trace_id 数
+-- 与 checkpoints 的区别：checkpoints 用 ON CONFLICT DO UPDATE 只保留最后一轮，
+-- 这里每轮追加一条，统计「轮次」口径的拦截率。
+CREATE TABLE IF NOT EXISTS review_rounds (
+  id            TEXT PRIMARY KEY,
+  trace_id      TEXT NOT NULL,
+  round         INTEGER NOT NULL,
+  critic_verdict TEXT NOT NULL,   -- 'approved' | 'blocked'
+  dropped_count INTEGER NOT NULL,
+  outcome       TEXT,             -- 'formal'|'provisional'|'expert-review'|null(未决)
+  created_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_review_rounds_trace ON review_rounds(trace_id, round);
+
 -- ── App settings (model gateway config, etc.) ──────────────────
 -- Key-value store. The model config lives under key 'model_config' as JSON;
 -- persisted to the local DB file so a configured key/model survives restarts.
@@ -504,7 +520,7 @@ CREATE INDEX IF NOT EXISTS idx_retrieval_logs_created ON retrieval_logs(created_
 CREATE INDEX IF NOT EXISTS idx_retrieval_logs_trace ON retrieval_logs(trace_id, round);
 `;
 
-export const SCHEMA_VERSION = "9";
+export const SCHEMA_VERSION = "11";
 
 /**
  * 存量库回填:FTS 表是 schema v2 新增的,老库里 chunks 已有数据但
@@ -579,5 +595,18 @@ export const ADDITIVE_COLUMNS: ReadonlyArray<{
     table: "latency_samples",
     column: "outcome",
     ddl: "ALTER TABLE latency_samples ADD COLUMN outcome TEXT NOT NULL DEFAULT 'completed'",
+  },
+  // v11 · 首 token 延迟。与 latency_samples.duration_ms 并列存,
+  // 让看板能按 provider 分组出首 token P95 —— 改变首 token 延迟靠的是
+  // 换模型,而 duration_ms 没法和「换模型」解耦,所以要两列分开看。
+  {
+    table: "latency_samples",
+    column: "first_token_ms",
+    ddl: "ALTER TABLE latency_samples ADD COLUMN first_token_ms INTEGER",
+  },
+  {
+    table: "latency_samples",
+    column: "provider",
+    ddl: "ALTER TABLE latency_samples ADD COLUMN provider TEXT",
   },
 ];

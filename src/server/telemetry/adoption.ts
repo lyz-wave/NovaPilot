@@ -27,7 +27,13 @@ export type AdoptionAction =
   | "copy"
   /** 导出 Markdown / JSON。 */
   | "export"
-  /** 同步到 LIMS / 项目系统。 */
+  /**
+   * 同步到 LIMS / 项目系统（用户主动触发）。
+   *
+   * ⚠️ 区分：`graph.ts` 里的自动飞书双写（`syncDecisionCard`）**不**调用
+   * `recordAdoptionEvent`——自动推送不代表用户采纳，混入会虚高采纳率。
+   * 只有用户在 UI 上点击「同步」按钮时才落这一条。
+   */
   | "sync";
 
 export const ADOPTION_ACTIONS: readonly AdoptionAction[] = ["copy", "export", "sync"];

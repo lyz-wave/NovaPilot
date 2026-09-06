@@ -36,7 +36,7 @@ describe("NovaBench 幻觉子集", () => {
     });
   }, 120_000);
 
-  it("八条对抗样例全部未被自信放行(第 5 节:目标 0,硬性)", async () => {
+  it("二十四条对抗样例全部未被自信放行(第 5 节:目标 0,硬性)", async () => {
     const db = createDb(":memory:");
     const rep = await runHallucinationSuite(db);
     const leaks = rep.cases.filter((c) => c.leaked);

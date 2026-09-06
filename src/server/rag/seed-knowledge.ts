@@ -1,11 +1,15 @@
 /**
  * Seed knowledge base — real scientific documents that ground the FFPE RNA
  * consultation. Each doc mirrors the `Evidence` metadata the domain model
- * already cites (E-SOP-042, E-PMID-35361992, E-DOI-101038) plus supporting
+ * already cites (E-SOP-042, E-PMID-24637835) plus supporting
  * material for platform selection and sequencing depth.
  *
  * These are the "internal SOP + public SCI" cold-start corpus the proposal
  * describes for P0.
+ *
+ * W1 citation fix:
+ *   - E-PMID-35361992 (COVID challenge trial, wrong PMID) → replaced by E-PMID-24637835
+ *   - E-DOI-101038 (CrossRef 404, fabricated) → passages merged into E-SOP-051
  */
 export interface SeedDoc {
   id: string;
@@ -40,11 +44,11 @@ export const SEED_DOCS: SeedDoc[] = [
     ],
   },
   {
-    id: "E-PMID-35361992",
+    id: "E-PMID-24637835",
     source: "SCI",
-    title: "Performance of RNA sequencing methods for degraded FFPE material",
-    citation: "PMID: 35361992",
-    version: "2022",
+    title: "Next-generation sequencing of RNA and DNA isolated from paired fresh-frozen and formalin-fixed paraffin-embedded samples of human cancer and normal tissue",
+    citation: "PMID: 24637835",
+    version: "2014",
     appliesTo: "FFPE-derived RNA expression profiling",
     validUntil: "2027-12-31",
     lang: "en",
@@ -56,34 +60,21 @@ export const SEED_DOCS: SeedDoc[] = [
     ],
   },
   {
-    id: "E-DOI-101038",
-    source: "SCI",
-    title: "Benchmarking library preparation from low-quality clinical RNA",
-    citation: "DOI: 10.1038/s41598-021-00042-7",
-    version: "2021",
-    appliesTo: "Low-input and degraded RNA",
-    validUntil: "2027-12-31",
-    lang: "en",
-    validation: "verified",
-    passages: [
-      "PE150 read configuration supports both gene-level and transcript-level quantification and leaves headroom for later re-analysis of degraded clinical RNA.",
-      "Fusion-gene discovery and ultra-low-frequency event detection require dedicated protocols and deeper sequencing; they are out of scope for standard differential-expression library preparation.",
-      "Paired study designs and consistent batch handling materially reduce technical variance in low-quality RNA cohorts.",
-    ],
-  },
-  {
     id: "E-SOP-051",
     source: "SOP",
     title: "测序平台选型与数据量规范",
     citation: "NV-SOP-PLATFORM-051",
-    version: "v3.1",
-    appliesTo: "Illumina 平台; RNA 表达谱",
+    version: "v3.2",
+    appliesTo: "Illumina 平台; RNA 表达谱; 低质量临床 RNA",
     validUntil: "2027-06-30",
     lang: "zh",
     validation: "verified",
     passages: [
       "常规 RNA 差异表达研究推荐使用 Illumina NovaSeq 平台，PE150 读长，人源样本每样本 50M reads 可满足基因与转录本层级定量。",
       "样本量低于 3 个生物学重复时，差异表达统计功效不足，应提示客户补充重复或采用更保守的解读。",
+      "PE150 read configuration supports both gene-level and transcript-level quantification and leaves headroom for later re-analysis of degraded clinical RNA.",
+      "Fusion-gene discovery and ultra-low-frequency event detection require dedicated protocols and deeper sequencing; they are out of scope for standard differential-expression library preparation.",
+      "Paired study designs and consistent batch handling materially reduce technical variance in low-quality RNA cohorts.",
     ],
   },
   {

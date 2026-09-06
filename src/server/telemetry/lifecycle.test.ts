@@ -33,6 +33,7 @@ function expertCase(overrides: Partial<ExpertCase> = {}): ExpertCase {
       attemptedAction: "已尝试",
       blockingUnknowns: [],
       reason: "越出适用范围",
+      defenseTrail: [],
     },
     ...overrides,
   } as ExpertCase;

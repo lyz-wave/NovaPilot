@@ -118,6 +118,13 @@ export interface ClarifyingQuestion {
   blocksFinalRecommendation: boolean;
 }
 
+/** 交接包防线摘要:记录每一层防线对本案的裁决,供接收专家快速定位问题根因。 */
+export interface DefenseRecord {
+  layer: "scope-contract" | "actor-critic" | "grounding" | "novaguard";
+  verdict: "passed" | "blocked";
+  detail: string;
+}
+
 export interface ExpertCase {
   id: string;
   status: "awaiting-claim" | "claimed" | "resolved";
@@ -135,6 +142,8 @@ export interface ExpertCase {
     decisionsNeeded: string[];
     /** AI 已检索证据链:专家批准前逐条复核(交接包完整性,大纲 4.7)。 */
     evidence?: Evidence[];
+    /** 各防线裁决摘要(四要素之一):帮助专家快速定位是哪层拦截的。 */
+    defenseTrail: DefenseRecord[];
   };
   /** 认领时间(ISO):驱动 SLA 剩余倒计时;退回队列时清除。 */
   claimedAt?: string;
@@ -329,23 +338,23 @@ const verifiedEvidence: Evidence[] = [
     validation: "verified",
   },
   {
-    id: "E-PMID-35361992",
+    id: "E-PMID-24637835",
     source: "SCI",
-    title: "Performance of RNA sequencing methods for degraded FFPE material",
-    citation: "PMID: 35361992",
-    version: "2022",
+    title: "Next-generation sequencing of RNA and DNA isolated from paired fresh-frozen and formalin-fixed paraffin-embedded samples of human cancer and normal tissue",
+    citation: "PMID: 24637835",
+    version: "2014",
     appliesTo: "FFPE-derived RNA expression profiling",
     validUntil: "2027-12-31",
     validation: "verified",
   },
   {
-    id: "E-DOI-101038",
-    source: "SCI",
-    title: "Benchmarking library preparation from low-quality clinical RNA",
-    citation: "DOI: 10.1038/s41598-021-00042-7",
-    version: "2021",
-    appliesTo: "Low-input and degraded RNA",
-    validUntil: "2027-12-31",
+    id: "E-SOP-051",
+    source: "SOP",
+    title: "测序平台选型与数据量规范",
+    citation: "NV-SOP-PLATFORM-051",
+    version: "v3.2",
+    appliesTo: "Illumina 平台; RNA 表达谱; 低质量临床 RNA",
+    validUntil: "2027-06-30",
     validation: "verified",
   },
   {
@@ -546,7 +555,7 @@ export function runConsultationJourney(
         ? "provisional"
       : "formal";
   const evidence = verifiedEvidence.map((item) =>
-    input.scenario === "evidence-conflict" && item.id === "E-PMID-35361992"
+    input.scenario === "evidence-conflict" && item.id === "E-PMID-24637835"
       ? { ...item, validation: "conflict" as const }
       : item,
   );
@@ -558,14 +567,14 @@ export function runConsultationJourney(
             id: "REC-LIBRARY",
             title: localized.primary,
             rationale: localized.primaryReason,
-            evidenceIds: ["E-SOP-042", "E-PMID-35361992"],
+            evidenceIds: ["E-SOP-042", "E-PMID-24637835"],
             boundary: "DV200 ≥ 50%; RNA input ≥ 10 ng",
           },
           {
             id: "REC-DEPTH",
             title: localized.depthTitle,
             rationale: localized.depthReason,
-            evidenceIds: ["E-SOP-042", "E-DOI-101038"],
+            evidenceIds: ["E-SOP-042", "E-SOP-051"],
             boundary: localized.depthBoundary,
           },
         ];
@@ -621,6 +630,7 @@ export function runConsultationJourney(
                 : localized.lowQualitySummary,
           evidenceConflict: input.scenario === "evidence-conflict",
           decisionsNeeded: ["确认灰区样本的建库路线", "给出额外质控或试建库要求"],
+          defenseTrail: [],
         },
       }
     : null;

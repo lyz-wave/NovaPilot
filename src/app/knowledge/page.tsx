@@ -17,7 +17,7 @@ export default function KnowledgePage() {
     const seed = createCandidateKnowledge({
       sourceCaseId: "CASE-2407",
       expertModification: "DV200 30–40% 时先进行两份代表样本试建库。",
-      evidenceIds: ["E-SOP-042", "E-PMID-35361992"],
+      evidenceIds: ["E-SOP-042", "E-PMID-24637835"],
     });
     saveCandidate(db, seed, new Date().toISOString());
     candidates = [seed];

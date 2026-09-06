@@ -75,9 +75,14 @@ const compliance = checkCitationCompliance(parsed.docs, ledger);
 if (compliance.violations.length > 0) {
   console.error(`\n引用核实合规率未达标,本次不摄取(${compliance.verified}/${compliance.total} 已核实):`);
   for (const v of compliance.violations) {
-    console.error(`  · ${v.docId} (${v.citation}): ${v.reason}`);
+    const hint =
+      v.reason === "title-mismatch"
+        ? "（话题不符，需人工核实后替换引用）"
+        : v.reason === "unverified"
+          ? "（先跑 kb:verify-citations 核实并留痕）"
+          : "";
+    console.error(`  · ${v.docId} (${v.citation}): ${v.reason}${hint}`);
   }
-  console.error(`  先跑 npm run kb:verify-citations 核实并留痕,再重新摄取。`);
   process.exit(1);
 }
 

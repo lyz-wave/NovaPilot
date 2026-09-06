@@ -141,6 +141,8 @@ export interface ConsultInput {
    * 只影响遥测口径,不进编排图:角色不该改变同一个问题的答案。
    */
   role?: ClientRole;
+  /** When set and NP_STREAM_TOKENS=true, receives incremental token deltas from draftNode. */
+  onToken?: (delta: string) => void;
 }
 
 /** Run a consultation against the live backend and return the graph result. */
@@ -168,6 +170,7 @@ export async function consult(
     history: input.history,
     // Live consultations feed the resolved-case memory for future retrieval.
     recordMemory: true,
+    onToken: input.onToken,
   };
   return runConsultationGraph(db, graphInput, gatewayCfg);
 }

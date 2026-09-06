@@ -13,7 +13,7 @@
  */
 import type { RetrievedChunk } from "../rag/retrieval";
 import type { SimilarCase } from "../rag/case-memory";
-import { complete, MAX_OUTPUT_TOKENS, type ChatMessage, type ModelGatewayConfig } from "./model-gateway";
+import { complete, streamText, MAX_OUTPUT_TOKENS, type ChatMessage, type ModelGatewayConfig } from "./model-gateway";
 import type { Locale, ProjectFacts, Scenario } from "@/domain/consultation-journey";
 import {
   canonicalCite,
@@ -236,36 +236,41 @@ export async function runActor(
     history?: ChatMessage[];
     /** Similar resolved cases fed as context only (never citable). */
     similarCases?: SimilarCase[];
+    /** When set and NP_STREAM_TOKENS=true, receive incremental tokens. */
+    onToken?: (delta: string) => void;
   },
   cfg: ModelGatewayConfig = {},
-): Promise<ActorOutput> {
+): Promise<ActorOutput & { firstTokenMs?: number }> {
   const evidenceBlock = input.chunks
     .map((c) => `[${c.citation} · ${c.source} · ${c.version}] ${c.text}`)
     .join("\n");
+
+  const completionReq = {
+    sensitive: input.sensitive,
+    maxTokens: MAX_OUTPUT_TOKENS,
+    messages: [
+      { role: "system" as const, content: ACTOR_SYSTEM[input.locale] },
+      ...(input.history ?? []),
+      {
+        role: "user" as const,
+        content:
+          `问题/Question: ${input.question}\n\n` +
+          `已确认事实/Confirmed facts:\n${factsBlock(input.facts)}\n\n` +
+          `证据/Evidence:\n${evidenceBlock}` +
+          similarCasesBlock(input.similarCases),
+      },
+    ],
+  };
 
   // Feed the model the full working context: recent conversation, the confirmed
   // project facts, and the retrieved evidence. A large maxTokens is only a
   // ceiling (billed by tokens actually generated) so the synthesis can run as
   // long as the answer genuinely needs.
-  const res = await complete(
-    {
-      sensitive: input.sensitive,
-      maxTokens: MAX_OUTPUT_TOKENS,
-      messages: [
-        { role: "system", content: ACTOR_SYSTEM[input.locale] },
-        ...(input.history ?? []),
-        {
-          role: "user",
-          content:
-            `问题/Question: ${input.question}\n\n` +
-            `已确认事实/Confirmed facts:\n${factsBlock(input.facts)}\n\n` +
-            `证据/Evidence:\n${evidenceBlock}` +
-            similarCasesBlock(input.similarCases),
-        },
-      ],
-    },
-    cfg,
-  );
+  const useStream = process.env.NP_STREAM_TOKENS === "true" && input.onToken != null;
+  const res = useStream
+    ? await streamText(completionReq, cfg, input.onToken!)
+    : await complete(completionReq, cfg);
+  const firstTokenMs = "firstTokenMs" in res ? (res as { firstTokenMs: number }).firstTokenMs : undefined;
 
   // Rule-based grounding: prefer evidence that is IN SCOPE for the sample
   // (e.g. FFPE RNA), not merely the top-ranked chunk — a good Actor grounds in
@@ -319,7 +324,7 @@ export async function runActor(
     // grounded and verifiable; the untrusted model text is discarded entirely.
   }
 
-  return { summary, recommendations, provider: res.provider };
+  return { summary, recommendations, provider: res.provider, firstTokenMs };
 }
 
 /**

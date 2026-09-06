@@ -20,12 +20,14 @@
  * 联网核实与离线摄取被拆成了两个独立的操作，前者的产物（台账）是后者的输入。
  * 这不是「没做联网核实」，是把它挪到了不违反离线约束的地方。
  *
- * 台账里当前的两条种子文献（E-PMID-35361992 / E-DOI-101038）标记为 unverified：
- * 本仓库的开发沙箱本身出网受限（WebFetch 对 pubmed.ncbi.nlm.nih.gov /
- * api.crossref.org / api.semanticscholar.org 都被安全策略拦下，实测确认过），
- * 没有条件真的去敲官方接口。诚实起见，没有在台账里「假装核实通过」去凑一个
- * 好看的百分比——那正是指标体系反复强调要杜绝的自证自过。需要一个有出网条件
- * 的环境跑一次 `kb:verify-citations` 才能把它们转正。
+ * W1 已将原两条虚假种子引用修正：
+ *   - E-PMID-35361992（COVID 挑战试验，非 FFPE RNA 内容）→ 替换为 E-PMID-24637835
+ *   - E-DOI-101038（CrossRef 404，虚构文献）→ passages 归入内部 E-SOP-051
+ *
+ * 台账状态说明：
+ *   verified      — PubMed/CrossRef 返回 200，且 upstreamTitle 与本地 title Jaccard ≥ 0.3
+ *   unverified    — 接口返回错误或网络失败，尚未核实
+ *   title-mismatch — 接口 200，但上游标题与本地标题 Jaccard < 0.3（话题不符或引用号张冠李戴）
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -41,13 +43,16 @@ export interface CitationIdentifier {
 export interface ProvenanceEntry {
   kind: CitationIdentifierKind;
   value: string;
-  status: "verified" | "unverified";
+  /** verified: 接口 200 且标题匹配；unverified: 接口失败；title-mismatch: 接口 200 但标题 Jaccard < 0.3 */
+  status: "verified" | "unverified" | "title-mismatch";
   /** 核实时间（ISO）。未核实/核实失败为 null。 */
   verifiedAt: string | null;
   /** 核实方式，例如 "PubMed E-utilities" / "CrossRef REST API"。未核实为空串。 */
   method: string;
   /** 人类可读的核实结果或失败原因，供台账审阅时对账。 */
   note: string;
+  /** 上游 API 返回的原始标题（PubMed/CrossRef）。供 Jaccard 校验与人工审阅。 */
+  upstreamTitle?: string;
 }
 
 export type ProvenanceLedger = Record<string, ProvenanceEntry>;
@@ -93,7 +98,7 @@ export function saveProvenanceLedger(ledger: ProvenanceLedger, file = provenance
 export interface CitationComplianceViolation {
   docId: string;
   citation: string;
-  reason: "unparseable" | "not-in-ledger" | "unverified";
+  reason: "unparseable" | "not-in-ledger" | "unverified" | "title-mismatch";
 }
 
 export interface CitationComplianceReport {
@@ -132,6 +137,8 @@ export function checkCitationCompliance(
       violations.push({ docId: doc.id, citation: doc.citation, reason: "not-in-ledger" });
     } else if (entry.status === "verified") {
       verified++;
+    } else if (entry.status === "title-mismatch") {
+      violations.push({ docId: doc.id, citation: doc.citation, reason: "title-mismatch" });
     } else {
       violations.push({ docId: doc.id, citation: doc.citation, reason: "unverified" });
     }

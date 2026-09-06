@@ -25,6 +25,8 @@
  *    0 是「走到了,一条都没通过」。把前者算成盲区,等于把系统异常记到知识
  *    质量的账上。所有聚合都显式排除 NULL。
  */
+import { readFileSync, existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { queryAll, type NovaDb } from "../db/client";
 import type {
   FallbackReason,
@@ -167,6 +169,14 @@ export interface BlindSpot {
   lastAt: string;
 }
 
+/** 一个语义聚类簇（由 scripts/blindspot-clusters.ts 生成后存 data/blindspot-report.json）。 */
+export interface BlindspotCluster {
+  cluster: number;
+  size: number;
+  weeksUnhit: number;
+  sampleQueries: string[];
+}
+
 export interface RetrievalBoard {
   channels: ChannelMix;
   vectorSpaces: VectorSpaceMix;
@@ -177,6 +187,11 @@ export interface RetrievalBoard {
   /** 从没被命中过的文档(covered 的补集),含种子知识。 */
   neverHit: DocHealth[];
   blindSpots: BlindSpot[];
+  /**
+   * 语义聚类盲区（由 `npm run blindspot:clusters` 生成）。
+   * 文件不存在时为空数组 —— 看板上盲区格仍显示 scope_hint 口径的 blindSpots。
+   */
+  blindspotClusters: BlindspotCluster[];
 }
 
 interface RoundRow {
@@ -371,7 +386,22 @@ export function retrievalBoard(db: NovaDb, sinceIso?: string): RetrievalBoard {
     },
     neverHit: health.filter((h) => h.hitRounds === 0),
     blindSpots: safe("blindSpots", () => blindSpots(db, since), []),
+    blindspotClusters: loadBlindspotClusters(),
   };
+}
+
+/** 从 data/blindspot-report.json 读取语义聚类结果（文件不存在时返回 []）。 */
+function loadBlindspotClusters(): BlindspotCluster[] {
+  try {
+    const reportPath = resolve(process.cwd(), "data", "blindspot-report.json");
+    if (!existsSync(reportPath)) return [];
+    const raw = JSON.parse(readFileSync(reportPath, "utf-8")) as {
+      clusters?: BlindspotCluster[];
+    };
+    return raw.clusters ?? [];
+  } catch {
+    return [];
+  }
 }
 
 /**

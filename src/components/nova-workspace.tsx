@@ -131,8 +131,12 @@ export function NovaWorkspace({
 
   // 正在进行的流所属的会话 id:切换会话/清空/新建后,旧流的结果不再写入当前视图。
   const streamConvRef = useRef<string | null>(null);
-  // 正在做“打字机”流式渲染的助手回合 id(null = 无)。
+  // 正在做"打字机"流式渲染的助手回合 id(null = 无)。
   const [streamingTurnId, setStreamingTurnId] = useState<string | null>(null);
+  // When NP_STREAM_TOKENS=true, live token deltas from the server accumulate here
+  // and are shown as a typing indicator before the full result frame arrives.
+  const [liveTokens, setLiveTokens] = useState("");
+  const liveTokensRef = useRef("");
   // 思考过程检查点的最新快照(闭包中的 progress 是旧值,这里用 ref 作为事实来源)。
   const progressRef = useRef<string[]>([]);
   // 在飞的 SSE 请求:切换/新建/清空会话时必须真的中断它。只把 streamConvRef 置空
@@ -180,7 +184,7 @@ export function NovaWorkspace({
   // Version pinned by the write-context contract (see api/write-context.ts).
   const cardVersion = latestCard?.card.version ?? 3;
 
-  /** 场景模板问题:由“当前界面事实”拼装(与用户所见参数一致,不再写死)。 */
+  /** 场景模板问题:由"当前界面事实"拼装(与用户所见参数一致,不再写死)。 */
   function scenarioQuestion(nextScenario: Scenario): string {
     return buildScenarioPrompt(nextScenario, facts);
   }
@@ -231,6 +235,8 @@ export function NovaWorkspace({
     const decoder = new TextDecoder();
     let buffer = "";
     let outcome: ResultFrame | null = null;
+    liveTokensRef.current = "";
+    setLiveTokens("");
 
     for (;;) {
       const { done, value } = await reader.read();
@@ -245,8 +251,16 @@ export function NovaWorkspace({
           const node = (parsed.data as { node: string }).node;
           progressRef.current = [...progressRef.current, node];
           setProgress(progressRef.current);
+        } else if (parsed.event === "token") {
+          // Incremental token delta (only when NP_STREAM_TOKENS=true on the server).
+          const delta = (parsed.data as { delta: string }).delta ?? "";
+          liveTokensRef.current += delta;
+          setLiveTokens(liveTokensRef.current);
         } else if (parsed.event === "result") {
           outcome = parsed.data as ResultFrame;
+          // Clear live tokens — the full result now drives rendering.
+          liveTokensRef.current = "";
+          setLiveTokens("");
         } else if (parsed.event === "error") {
           throw new Error((parsed.data as { message: string }).message);
         }
@@ -272,7 +286,7 @@ export function NovaWorkspace({
   ): Promise<boolean> {
     const streamConvId = activeConversationId;
     streamConvRef.current = streamConvId;
-    // quickLabel 存在 ⇒ 快捷场景注入(带“快捷提问”徽标),否则为用户手输。
+    // quickLabel 存在 ⇒ 快捷场景注入(带"快捷提问"徽标),否则为用户手输。
     setTurns((prev) => [
       ...prev,
       newTurn({
@@ -286,6 +300,8 @@ export function NovaWorkspace({
     setIsPending(true);
     setProgress([]);
     progressRef.current = [];
+    liveTokensRef.current = "";
+    setLiveTokens("");
     try {
       const outcome = await streamConsultation(question, nextLocale, nextFacts);
       // 流返回时若已切走,结果仍持久化在原会话,但不写入当前视图(仍算成功)。
@@ -352,8 +368,8 @@ export function NovaWorkspace({
     setLocale(nextLocale);
   }
 
-  /** 左侧“待客户确认”chips:点击即发送对应追问(带快捷提问徽标)。返回是否成功,
-   *  供 rail 只在成功时把 chip 标记为“已追问”。 */
+  /** 左侧"待客户确认"chips:点击即发送对应追问(带快捷提问徽标)。返回是否成功,
+   *  供 rail 只在成功时把 chip 标记为"已追问"。 */
   async function askFollowUp(question: string, label: string): Promise<boolean> {
     if (isPending) return false;
     setScenario("standard");
@@ -616,6 +632,7 @@ export function NovaWorkspace({
         factsConfirmed={JSON.stringify(facts) === JSON.stringify(confirmedFacts)}
         streamingTurnId={streamingTurnId}
         onStreamDone={onStreamDone}
+        liveTokens={liveTokens}
       />
       <DecisionCardPanel
         result={latestCard}

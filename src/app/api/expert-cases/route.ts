@@ -108,7 +108,7 @@ export async function POST(request: Request) {
       evidenceIds:
         body.evidenceIds && body.evidenceIds.length > 0
           ? body.evidenceIds
-          : ["E-SOP-042", "E-PMID-35361992"],
+          : ["E-SOP-042", "E-PMID-24637835"],
     });
     saveCandidate(db, candidate, now);
   }

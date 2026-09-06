@@ -127,7 +127,11 @@ function streamConsultation(input: {
         // Classify + run. Chat turns skip the graph entirely (no checkpoints);
         // research turns run the graph and we replay its persisted checkpoints.
         const startedAt = performance.now();
-        const outcome = await respond(input);
+        // When NP_STREAM_TOKENS=true, forward incremental token deltas as SSE frames.
+        const onToken = process.env.NP_STREAM_TOKENS === "true"
+          ? (delta: string) => { try { send("token", { delta }); } catch {} }
+          : undefined;
+        const outcome = await respond({ ...input, onToken });
         // 量到 respond 返回,不含后续 SSE 帧的推送时间 —— 那部分取决于客户端读取
         // 速度,把它算进服务端延迟会让同一次咨询在不同网络下出不同的 P95。
         recordLatencySample(getDb(), {
@@ -138,6 +142,8 @@ function streamConsultation(input: {
           durationMs: performance.now() - startedAt,
           // 还没收尾:帧全部推完(finally)才算 completed。
           outcome: "started",
+          firstTokenMs: outcome.kind === "card" ? outcome.firstTokenMs : undefined,
+          provider: outcome.kind === "card" ? outcome.provider : undefined,
           now: new Date().toISOString(),
         });
         const contextUsage = conversationContext(

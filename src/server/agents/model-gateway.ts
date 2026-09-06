@@ -79,6 +79,8 @@ export interface ModelGatewayConfig {
   miniModel?: string;
   /** Injected for tests: a deterministic generator used as fallback. */
   fallback?: (req: CompletionRequest) => string;
+  /** Called when the deterministic fallback is taken (provider off or unreachable). */
+  onDegrade?: (reason: string) => void;
 }
 
 /**
@@ -111,7 +113,7 @@ const MODEL_TIMEOUT_MS = 120_000;
  */
 export function resolveConfig(cfg: ModelGatewayConfig = {}): Required<
   Pick<ModelGatewayConfig, "provider" | "model" | "miniModel">
-> & { apiKey?: string; baseUrl?: string; fallback?: ModelGatewayConfig["fallback"] } {
+> & { apiKey?: string; baseUrl?: string; fallback?: ModelGatewayConfig["fallback"]; onDegrade?: ModelGatewayConfig["onDegrade"] } {
   const env = process.env;
   const apiKey =
     cfg.apiKey ?? env.NOVAPILOT_LLM_API_KEY ?? env.ANTHROPIC_API_KEY ?? env.OPENAI_API_KEY;
@@ -137,6 +139,7 @@ export function resolveConfig(cfg: ModelGatewayConfig = {}): Required<
       env.NOVAPILOT_LLM_MINI_MODEL ??
       (provider === "anthropic" ? "claude-haiku-4-5-20251001" : "gpt-4o-mini"),
     fallback: cfg.fallback,
+    onDegrade: cfg.onDegrade,
   };
 }
 
@@ -179,6 +182,7 @@ export async function complete(
     }
   }
 
+  try { c.onDegrade?.("provider-off"); } catch {}
   const text = (c.fallback ?? deterministicFallback)(req);
   return {
     text,
@@ -266,6 +270,183 @@ async function callOpenAICompatible(
           outputTokens: data.usage.completion_tokens ?? 0,
         }
       : undefined,
+  };
+}
+
+/**
+ * Stream a chat request, calling `onToken` for each incremental delta.
+ * Returns the full CompletionResult plus `firstTokenMs` (ms from call to first token).
+ * Falls back to the deterministic path (fires onToken once) when no provider is available.
+ * Guarded by `NP_STREAM_TOKENS=true` — callers should check before using.
+ */
+export async function streamText(
+  req: CompletionRequest,
+  cfg: ModelGatewayConfig = {},
+  onToken: (delta: string) => void,
+): Promise<CompletionResult & { firstTokenMs: number }> {
+  const resolved = resolveConfig(cfg);
+  const c = req.tier === "mini" ? { ...resolved, model: resolved.miniModel } : resolved;
+  const externalAllowed = !req.sensitive || !!c.baseUrl;
+
+  if (c.provider !== "off" && c.apiKey && externalAllowed) {
+    try {
+      if (c.provider === "anthropic" && !c.baseUrl) {
+        return await streamAnthropic(req, c, onToken);
+      } else {
+        return await streamOpenAICompatible(req, c, onToken);
+      }
+    } catch {
+      // fall through to deterministic
+    }
+  }
+
+  try { c.onDegrade?.("provider-off"); } catch {}
+  const t0 = Date.now();
+  const text = (c.fallback ?? deterministicFallback)(req);
+  const firstTokenMs = Date.now() - t0;
+  try { onToken(text); } catch {}
+  return {
+    text,
+    provider: "deterministic",
+    model: "novapilot-deterministic-v1",
+    route: req.sensitive ? "private-model" : "external-model",
+    firstTokenMs,
+  };
+}
+
+async function streamAnthropic(
+  req: CompletionRequest,
+  c: ReturnType<typeof resolveConfig>,
+  onToken: (delta: string) => void,
+): Promise<CompletionResult & { firstTokenMs: number }> {
+  const system = req.messages.filter((m) => m.role === "system").map((m) => m.content).join("\n");
+  const messages = req.messages
+    .filter((m) => m.role !== "system")
+    .map((m) => ({ role: m.role, content: m.content }));
+  const t0 = Date.now();
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": c.apiKey!,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: c.model,
+      system,
+      messages,
+      max_tokens: req.maxTokens ?? MAX_OUTPUT_TOKENS,
+      temperature: req.temperature ?? 0.2,
+      stream: true,
+    }),
+    signal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`anthropic ${res.status}`);
+
+  let fullText = "";
+  let firstTokenMs = -1;
+  let inputTokens = 0;
+  let outputTokens = 0;
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const raw = line.slice(6).trim();
+      if (raw === "[DONE]") continue;
+      try {
+        const ev = JSON.parse(raw) as {
+          type: string;
+          delta?: { type: string; text?: string };
+          message?: { usage?: { input_tokens?: number; output_tokens?: number } };
+          usage?: { input_tokens?: number; output_tokens?: number };
+        };
+        if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta" && ev.delta.text) {
+          if (firstTokenMs < 0) firstTokenMs = Date.now() - t0;
+          fullText += ev.delta.text;
+          try { onToken(ev.delta.text); } catch {}
+        } else if (ev.type === "message_delta" && ev.usage) {
+          outputTokens = ev.usage.output_tokens ?? outputTokens;
+        } else if (ev.type === "message_start" && ev.message?.usage) {
+          inputTokens = ev.message.usage.input_tokens ?? inputTokens;
+        }
+      } catch { /* skip malformed */ }
+    }
+  }
+  return {
+    text: fullText,
+    provider: "anthropic",
+    model: c.model,
+    route: req.sensitive ? "private-model" : "external-model",
+    usage: { inputTokens, outputTokens },
+    firstTokenMs: firstTokenMs >= 0 ? firstTokenMs : Date.now() - t0,
+  };
+}
+
+async function streamOpenAICompatible(
+  req: CompletionRequest,
+  c: ReturnType<typeof resolveConfig>,
+  onToken: (delta: string) => void,
+): Promise<CompletionResult & { firstTokenMs: number }> {
+  const base = c.baseUrl ?? "https://api.openai.com/v1";
+  const t0 = Date.now();
+  const res = await fetch(`${base.replace(/\/$/, "")}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${c.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: c.model,
+      messages: req.messages,
+      max_tokens: req.maxTokens ?? MAX_OUTPUT_TOKENS,
+      temperature: req.temperature ?? 0.2,
+      stream: true,
+    }),
+    signal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`openai ${res.status}`);
+
+  let fullText = "";
+  let firstTokenMs = -1;
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const raw = line.slice(6).trim();
+      if (raw === "[DONE]") continue;
+      try {
+        const ev = JSON.parse(raw) as {
+          choices?: Array<{ delta?: { content?: string } }>;
+        };
+        const delta = ev.choices?.[0]?.delta?.content ?? "";
+        if (delta) {
+          if (firstTokenMs < 0) firstTokenMs = Date.now() - t0;
+          fullText += delta;
+          try { onToken(delta); } catch {}
+        }
+      } catch { /* skip malformed */ }
+    }
+  }
+  return {
+    text: fullText,
+    provider: "openai",
+    model: c.model,
+    route: c.baseUrl ? "private-model" : "external-model",
+    firstTokenMs: firstTokenMs >= 0 ? firstTokenMs : Date.now() - t0,
   };
 }
 

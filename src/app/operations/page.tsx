@@ -19,6 +19,7 @@ import { lifecycleBoard } from "@/server/telemetry/lifecycle";
 import { degradeMatrixSummary } from "@/server/telemetry/degrade-matrix";
 import { defenseLayerBoard } from "@/server/telemetry/defense-layers";
 import { citationComplianceBoard } from "@/server/telemetry/citation-compliance";
+import { interceptResolutionRate, handoffCompleteness } from "@/server/telemetry/interception";
 
 // Node runtime (node:sqlite) + always run the gold set at request time so the
 // dashboard opens on the real, current release-gate state.
@@ -73,6 +74,8 @@ export default async function OperationsPage() {
   // §7 引用核实合规率:全库口径(不切窗)——文献一旦入库,合规状态不随周变化,
   // 与「知识入库量」那一行的「全库累计」列是同一种全量口径。
   const citationCompliance = citationComplianceBoard(db);
+  const interceptResolution = interceptResolutionRate(db, since);
+  const completeness = handoffCompleteness(db, since);
   const guardrail: GuardrailBoardView = {
     ...board,
     retrieval,
@@ -81,6 +84,8 @@ export default async function OperationsPage() {
     degrade,
     defense,
     citationCompliance,
+    interceptResolution,
+    handoffCompleteness: completeness,
     p0: p0Breaches(board),
     p1: p1Breaches(board),
     // 跨周唤醒占比是 v1.1 第 11 节 P2 的第三项,和检索侧两项并进同一条 P2 通道。

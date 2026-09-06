@@ -289,6 +289,7 @@ export function guardrailBoard(db: NovaDb, sinceIso?: string): GuardrailBoard {
           // 恰好是这张看板存在的理由的反面。
           successRate: null,
         },
+        firstToken: [],
       },
       "latencySummary",
     ),

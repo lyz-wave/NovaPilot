@@ -168,6 +168,8 @@ export interface GuardrailBoardView {
       inflight: number;
       successRate: number | null;
     };
+    /** 首 token P95 按 provider 分组(仅 NP_STREAM_TOKENS=true 时有非空行)。 */
+    firstToken: Array<{ provider: string; stats: LatencyStatsView }>;
   };
   knowledge: {
     documents: number;
@@ -202,6 +204,8 @@ export interface GuardrailBoardView {
     sopCoverage: { total: number; covered: number; rate: number | null };
     neverHit: Array<{ documentId: string; title: string; source: string }>;
     blindSpots: Array<{ topic: string; sessions: number; sampleQuery: string; lastAt: string }>;
+    /** 语义聚类盲区（由 blindspot:clusters 脚本生成，文件不存在时为空）。 */
+    blindspotClusters: Array<{ cluster: number; size: number; weeksUnhit: number; sampleQueries: string[] }>;
   };
   p0: string[];
   p1: string[];
@@ -281,6 +285,18 @@ export interface GuardrailBoardView {
     verified: number;
     rate: number | null;
     violations: Array<{ docId: string; citation: string; reason: string }>;
+  };
+  /** §4.3 Critic 拦截→解决转化率。分母是有至少一轮 blocked 的 trace 数。 */
+  interceptResolution: {
+    intercepted: number;
+    resolved: number;
+    rate: number | null;
+  };
+  /** §4.7 交接包完整度。分子是 defenseTrail 非空的转专家案例数。 */
+  handoffCompleteness: {
+    total: number;
+    complete: number;
+    rate: number | null;
   };
 }
 
@@ -518,9 +534,15 @@ function retrievalRows(r: GuardrailBoardView["retrieval"]): RetrievalRow[] {
     },
     {
       metric: "知识盲区主题数",
-      basis: "末轮检索证据零核验的会话，按 scope hint 归组",
-      value: String(r.blindSpots.length),
-      reading: "不用检索分值判定：rerank 在查询内部做了归一化，拿它设阈值恒为真",
+      basis: r.blindspotClusters.length > 0
+        ? "语义聚类口径：连续 ≥2 周未命中 + ≥3 次的簇数（npm run blindspot:clusters）"
+        : "末轮检索证据零核验的会话，按 scope hint 归组（运行 blindspot:clusters 升级为语义聚类口径）",
+      value: r.blindspotClusters.length > 0
+        ? String(r.blindspotClusters.filter((c) => c.weeksUnhit >= 2).length)
+        : String(r.blindSpots.length),
+      reading: r.blindspotClusters.length > 0
+        ? `聚类阈值 0.75 · 全部 ${r.blindspotClusters.length} 个有效簇`
+        : "不用检索分值判定：rerank 在查询内部做了归一化，拿它设阈值恒为真",
     },
     {
       metric: "检索段耗时 P95",
@@ -1209,6 +1231,15 @@ export function OperationsDashboard({
               。只看全局 P95 分不出「真的变快了」和「把该转专家的直接答掉了」。
             </p>
           )}
+          {guardrail.latency.firstToken.length > 0 && (
+            <p>
+              <b>首 token P95（按 provider）：</b>
+              {guardrail.latency.firstToken
+                .map((g) => `${g.provider} ${msOrDash(g.stats.p95)}（${g.stats.samples} 条）`)
+                .join(" · ")}
+              。首 token 延迟需 NP_STREAM_TOKENS=true 才采集；无数据时本行不显示。
+            </p>
+          )}
         </div>
       </section>
 
@@ -1266,14 +1297,24 @@ export function OperationsDashboard({
         </div>
 
         <div className="pair-footnotes">
-          {guardrail.retrieval.blindSpots.length > 0 ? (
+          {guardrail.retrieval.blindspotClusters.length > 0 ? (
+            <p>
+              <b>语义聚类盲区（{guardrail.retrieval.blindspotClusters.length} 簇，阈值 0.75）：</b>
+              {guardrail.retrieval.blindspotClusters
+                .filter((c) => c.weeksUnhit >= 2)
+                .slice(0, 5)
+                .map((c) => `簇 ${c.cluster}（${c.size} 次 · 连续 ${c.weeksUnhit} 周未命中 · 例：${c.sampleQueries[0] ?? ""}）`)
+                .join("；")}
+              。口径：连续 ≥2 周且 ≥3 次；聚类由 <code>npm run blindspot:clusters</code> 离线生成。
+            </p>
+          ) : guardrail.retrieval.blindSpots.length > 0 ? (
             <p>
               <b>知识盲区（{guardrail.retrieval.blindSpots.length} 个主题）：</b>
               {guardrail.retrieval.blindSpots
                 .map((s) => `${s.topic}（${s.sessions} 次，例：${s.sampleQuery}）`)
                 .join("；")}
               。口径是<b>末轮</b>检索出的证据一条都没撑住核验 —— 前几轮检索不到是设计意图
-              （所以才加深），末轮还是零核验才叫盲区。
+              （所以才加深），末轮还是零核验才叫盲区。运行 <code>npm run blindspot:clusters</code> 升级为语义聚类口径。
             </p>
           ) : (
             <p>
@@ -1522,6 +1563,48 @@ export function OperationsDashboard({
             </p>
           </div>
         )}
+      </section>
+
+      <section className="guardrail-board interception-board">
+        <div className="panel-heading">
+          <div>
+            <span className="eyebrow">INTERCEPTION · 指标体系 v1.1 §4.3</span>
+            <h2>拦截→解决转化率 / 交接包完整度</h2>
+          </div>
+        </div>
+        <div className="pair-table" role="table" aria-label="拦截与交接指标">
+          <div className="pair-row pair-head" role="row">
+            <span role="columnheader">指标</span>
+            <span role="columnheader">当前值</span>
+            <span role="columnheader">分子/分母</span>
+          </div>
+          <div className="pair-row" role="row">
+            <span className="pair-cell incentive" role="cell">
+              <em>Critic 拦截→解决转化率</em>
+            </span>
+            <span className="pair-cell guardrail" role="cell">
+              <strong>{pctOrDash(guardrail.interceptResolution.rate)}</strong>
+            </span>
+            <span className="pair-cell verdict" role="cell">
+              {guardrail.interceptResolution.intercepted === 0
+                ? "窗口内暂无拦截记录。"
+                : `${guardrail.interceptResolution.resolved} / ${guardrail.interceptResolution.intercepted} 次被拦截后转为正式卡。`}
+            </span>
+          </div>
+          <div className="pair-row" role="row">
+            <span className="pair-cell incentive" role="cell">
+              <em>交接包完整度（防线摘要）</em>
+            </span>
+            <span className="pair-cell guardrail" role="cell">
+              <strong>{pctOrDash(guardrail.handoffCompleteness.rate)}</strong>
+            </span>
+            <span className="pair-cell verdict" role="cell">
+              {guardrail.handoffCompleteness.total === 0
+                ? "暂无转专家案例。"
+                : `${guardrail.handoffCompleteness.complete} / ${guardrail.handoffCompleteness.total} 个交接包带防线摘要。`}
+            </span>
+          </div>
+        </div>
       </section>
 
       <section className="bench-history">

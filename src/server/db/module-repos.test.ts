@@ -26,6 +26,7 @@ function sampleCase(id = "CASE-NP-1"): ExpertCase {
       reason: "SOP 与外部文献存在冲突",
       evidenceConflict: true,
       decisionsNeeded: ["确认灰区样本的建库路线", "给出额外质控或试建库要求"],
+      defenseTrail: [],
     },
   };
 }

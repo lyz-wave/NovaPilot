@@ -32,6 +32,10 @@ export interface LatencySampleInput {
    */
   outcome?: LatencyOutcome;
   now: string;
+  /** ms from request to first token (only available when NP_STREAM_TOKENS=true). */
+  firstTokenMs?: number;
+  /** Model provider that generated the response (anthropic / openai / deterministic). */
+  provider?: string;
 }
 
 export type LatencyOutcome = "started" | "completed" | "aborted" | "failed";
@@ -39,13 +43,15 @@ export type LatencyOutcome = "started" | "completed" | "aborted" | "failed";
 export function recordLatencySample(db: NovaDb, input: LatencySampleInput): void {
   try {
     db.prepare(
-      `INSERT INTO latency_samples(id, trace_id, route, kind, card_status, duration_ms, outcome, created_at)
-       VALUES(?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO latency_samples(id, trace_id, route, kind, card_status, duration_ms, outcome, first_token_ms, provider, created_at)
+       VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
-         duration_ms = excluded.duration_ms,
-         card_status = excluded.card_status,
-         outcome     = excluded.outcome,
-         created_at  = excluded.created_at`,
+         duration_ms    = excluded.duration_ms,
+         card_status    = excluded.card_status,
+         outcome        = excluded.outcome,
+         first_token_ms = excluded.first_token_ms,
+         provider       = excluded.provider,
+         created_at     = excluded.created_at`,
     ).run(
       `LT-${input.traceId}-${input.route}`,
       input.traceId,
@@ -55,6 +61,8 @@ export function recordLatencySample(db: NovaDb, input: LatencySampleInput): void
       // 负数/小数都不该进 P95;Math.max(0, ...) 比丢样本好 —— 丢样本会让分母漂。
       Math.max(0, Math.round(input.durationMs)),
       input.outcome ?? "completed",
+      input.firstTokenMs != null ? Math.max(0, Math.round(input.firstTokenMs)) : null,
+      input.provider ?? null,
       input.now,
     );
   } catch (err) {
@@ -102,6 +110,8 @@ export interface LatencySummary {
   byStatus: Array<{ status: string; stats: LatencyStats }>;
   /** 流式成功率(第 8 节)。分母只含流式路由,非流式没有「中断」这个状态。 */
   stream: StreamOutcomeSummary;
+  /** 首 token 延迟(P95),按 provider 分组。仅 NP_STREAM_TOKENS=true 时有非空行。 */
+  firstToken: Array<{ provider: string; stats: LatencyStats }>;
 }
 
 export interface StreamOutcomeSummary {
@@ -147,11 +157,11 @@ function statsOf(values: number[]): LatencyStats {
 }
 
 export function latencySummary(db: NovaDb, sinceIso?: string): LatencySummary {
-  let rows: Array<{ card_status: string; duration_ms: number; outcome: string; route: string }> = [];
+  let rows: Array<{ card_status: string; duration_ms: number; outcome: string; route: string; first_token_ms: number | null; provider: string | null }> = [];
   try {
-    rows = queryAll<{ card_status: string; duration_ms: number; outcome: string; route: string }>(
+    rows = queryAll<{ card_status: string; duration_ms: number; outcome: string; route: string; first_token_ms: number | null; provider: string | null }>(
       db,
-      `SELECT card_status, duration_ms, outcome, route FROM latency_samples
+      `SELECT card_status, duration_ms, outcome, route, first_token_ms, provider FROM latency_samples
        WHERE (? IS NULL OR created_at >= ?)`,
       sinceIso ?? null,
       sinceIso ?? null,
@@ -170,6 +180,17 @@ export function latencySummary(db: NovaDb, sinceIso?: string): LatencySummary {
   const streamRows = rows.filter((r) => r.route.endsWith(":stream"));
   const count = (o: string) => streamRows.filter((r) => r.outcome === o).length;
   const streams = streamRows.length;
+
+  // first_token P95 by provider — only rows with non-null first_token_ms contribute.
+  const ftGroups = new Map<string, number[]>();
+  for (const r of done) {
+    if (r.first_token_ms == null) continue;
+    const key = r.provider ?? "unknown";
+    const bucket = ftGroups.get(key) ?? [];
+    bucket.push(r.first_token_ms);
+    ftGroups.set(key, bucket);
+  }
+
   return {
     overall: statsOf(done.map((r) => r.duration_ms)),
     byStatus: [...groups.entries()]
@@ -183,5 +204,8 @@ export function latencySummary(db: NovaDb, sinceIso?: string): LatencySummary {
       inflight: count("started"),
       successRate: streams === 0 ? null : count("completed") / streams,
     },
+    firstToken: [...ftGroups.entries()]
+      .map(([provider, values]) => ({ provider, stats: statsOf(values) }))
+      .sort((a, b) => b.stats.samples - a.stats.samples),
   };
 }

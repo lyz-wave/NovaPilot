@@ -1,18 +1,11 @@
 {
-  "pmid:35361992": {
+  "pmid:24637835": {
     "kind": "pmid",
-    "value": "35361992",
+    "value": "24637835",
     "status": "verified",
-    "verifiedAt": "2026-09-06T11:25:01.031Z",
+    "verifiedAt": "2026-09-06T21:13:00.000Z",
     "method": "PubMed E-utilities",
-    "note": "标题:Safety, tolerability and viral kinetics during SARS-CoV-2 human challenge in young adults."
-  },
-  "doi:10.1038/s41598-021-00042-7": {
-    "kind": "doi",
-    "value": "10.1038/s41598-021-00042-7",
-    "status": "unverified",
-    "verifiedAt": null,
-    "method": "CrossRef REST API",
-    "note": "CrossRef 返回 HTTP 404"
+    "upstreamTitle": "Next-generation sequencing of RNA and DNA isolated from paired fresh-frozen and formalin-fixed paraffin-embedded samples of human cancer and normal tissue",
+    "note": "W1 修正引用：原 PMID 35361992（SARS-CoV-2 挑战试验，话题不符）已替换为本条。待网络可用环境运行 kb:verify-citations --recheck 重新确认。"
   }
 }

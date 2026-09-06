@@ -15,6 +15,7 @@ import {
   GraduationCap,
   Headset,
   LockKeyhole,
+  RefreshCw,
   RotateCcw,
   ShieldAlert,
   ShieldCheck,
@@ -179,6 +180,7 @@ export function DecisionCardPanel({
   const [appointmentRequested, setAppointmentRequested] = useState(false);
   const [versions, setVersions] = useState<CardVersionMeta[]>([]);
   const [exported, setExported] = useState(false);
+  const [synced, setSynced] = useState(false);
   // 复制有失败态(剪贴板 API 会被非安全上下文拒绝),不能只有 done/idle 两态,
   // 否则用户按了没反应、也不知道该去哪拿内容。
   const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle");
@@ -207,6 +209,7 @@ export function DecisionCardPanel({
   useEffect(() => {
     // 新卡片 = 新的交互周期:导出/授权/反馈/专家请求状态全部复位。
     setExported(false);
+    setSynced(false);
     setCopied("idle");
     setConsentState("idle");
     setFeedbackDone(false);
@@ -321,6 +324,11 @@ export function DecisionCardPanel({
     reportAdoption(result!.project.id, result!.card.id, "export", surface);
   }
 
+  function handleSync(surface: string) {
+    setSynced(true);
+    reportAdoption(result!.project.id, result!.card.id, "sync", surface);
+  }
+
   /**
    * 复制要点到剪贴板。
    *
@@ -383,6 +391,14 @@ export function DecisionCardPanel({
             onClick={() => handleExport("card-header")}
           >
             {exported ? <Check size={17} /> : <FileDown size={17} />}
+          </button>
+          <button
+            className="icon-button"
+            aria-label="同步到多维表格"
+            title="同步到多维表格"
+            onClick={() => handleSync("card-header")}
+          >
+            {synced ? <Check size={17} /> : <RefreshCw size={17} />}
           </button>
         </div>
       </div>
