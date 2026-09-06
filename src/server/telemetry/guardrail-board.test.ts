@@ -19,10 +19,12 @@ import {
   telemetryRowCounts,
   weekStart,
 } from "./guardrail-board";
-import { latencySummary, recordLatencySample } from "./latency";
+import { latencySummary, markLatencyOutcome, recordLatencySample } from "./latency";
 import { recordCitationAudit } from "../guards/citation-audit";
 import { enqueueReviewSample, setExpertVerdict } from "./review-samples";
 import { recordCaseClosure } from "./case-closure";
+import { saveCandidate } from "../db/repositories";
+import type { CandidateKnowledge } from "@/domain/consultation-journey";
 
 const NOW = "2026-09-02T00:00:00.000Z";
 
@@ -281,20 +283,39 @@ describe("护栏对看板 · 每格都必须真的读到数", () => {
     expect(k.chunksTotal).toBe(1);
   });
 
-  it("候选知识按状态分桶,rejected 既不算已批也不算待审", () => {
-    const insert = (id: string, status: string) =>
-      db
-        .prepare(
-          `INSERT INTO candidates(id, source_case_id, statement, evidence_ids, scope, counterexample,
-             owner, version, valid_until, status, production_eligible, audit_trail, created_at)
-           VALUES(?, 'EC-1', '结论', '[]', '范围', '反例', 'expert', 1, '2030-01-01', ?, 0, '[]', ?)`,
-        )
-        .run(id, status, NOW);
-    insert("CK-1", "approved");
-    insert("CK-2", "pending");
-    insert("CK-3", "rejected");
+  /**
+   * 这条测试此前用的是 `approved` / `pending` 两个**本系统从不写入**的状态值,
+   * 于是它和被测代码一起自洽,而看板上两格恒为 0 谁也没发现。
+   * 现在改成走 saveCandidate 真正写库,状态取自 CandidateKnowledge 的枚举 ——
+   * 聚合的取值集合必须和写入方对齐,这一点只能由「真的写一遍」来钉。
+   */
+  it("候选知识按状态分桶,取值必须和写入方的枚举对齐", () => {
+    const base = {
+      sourceCaseId: "EC-1",
+      statement: "结论",
+      evidenceIds: [] as string[],
+      scope: "范围",
+      counterexample: "反例",
+      owner: "expert",
+      version: 1,
+      validUntil: "2030-01-01",
+      productionEligible: false,
+      auditTrail: [],
+      rollbackVersion: null,
+    } satisfies Omit<CandidateKnowledge, "id" | "status">;
+    const save = (id: string, status: CandidateKnowledge["status"], live = false) =>
+      saveCandidate(db, { ...base, id, status, productionEligible: live }, NOW);
+
+    save("CK-1", "owner-approved");
+    save("CK-2", "gray-active", true);
+    save("CK-3", "candidate");
+    save("CK-4", "rejected");
+
     const k = guardrailBoard(db).knowledge;
-    expect(k.candidatesApproved).toBe(1);
+    // 已过 Owner 审的两档都算「已批」:gray-active 是本系统的终态生产可用状态。
+    expect(k.candidatesApproved).toBe(2);
+    // 待审只有还没被审过的那一档。把 gray-active 算进待审(旧口径的 NOT IN 写法)
+    // 会让「待审积压」把已经上线的知识也算进去。
     expect(k.candidatesPending).toBe(1);
   });
 
@@ -476,5 +497,114 @@ describe("延迟采样", () => {
     db.exec("DROP TABLE latency_samples");
     expect(() => sample("t1", 100)).not.toThrow();
     expect(latencySummary(db).overall.samples).toBe(0);
+  });
+});
+
+/**
+ * §8 流式会话成功率。
+ *
+ * 改造前这一格是**结构性造假**:采样写在 respond() 之后,中断的流一行都不落,
+ * 于是「成功率」由成功的样本自己算出来,恒等于 100%。修法是把分母提前 ——
+ * 开流那一刻就落一行 started,收场时只改状态。下面六条钉的就是这件事。
+ */
+describe("§8 流式会话收场", () => {
+  let db: NovaDb;
+  beforeEach(() => {
+    db = createDb(":memory:");
+  });
+
+  const ROUTE = "consultations:stream";
+  function open(traceId: string, now = NOW) {
+    recordLatencySample(db, {
+      traceId,
+      route: ROUTE,
+      kind: "card",
+      durationMs: 0,
+      outcome: "started",
+      now,
+    });
+  }
+
+  it("开流即落分母:一条都没收场时成功率是 0%,不是 100%", () => {
+    open("s1");
+    open("s2");
+    const s = latencySummary(db).stream;
+    expect(s.streams).toBe(2);
+    expect(s.inflight).toBe(2);
+    expect(s.successRate).toBe(0);
+  });
+
+  it("三种收场分别落格", () => {
+    open("done");
+    open("cancel");
+    open("boom");
+    markLatencyOutcome(db, { traceId: "done", route: ROUTE, outcome: "completed" });
+    markLatencyOutcome(db, { traceId: "cancel", route: ROUTE, outcome: "aborted" });
+    markLatencyOutcome(db, { traceId: "boom", route: ROUTE, outcome: "failed" });
+
+    const s = latencySummary(db).stream;
+    expect(s).toMatchObject({ streams: 3, completed: 1, aborted: 1, failed: 1, inflight: 0 });
+    expect(s.successRate).toBeCloseTo(1 / 3);
+  });
+
+  it("收场是终态:aborted 不会被随后的 completed 洗掉", () => {
+    open("race");
+    // cancel() 与 finally 的触发顺序不保证。谁先到算谁,但先到的那个说了算 ——
+    // 否则用户点了取消,最后仍会被记成一次成功。
+    markLatencyOutcome(db, { traceId: "race", route: ROUTE, outcome: "aborted" });
+    markLatencyOutcome(db, { traceId: "race", route: ROUTE, outcome: "completed" });
+    expect(latencySummary(db).stream).toMatchObject({ aborted: 1, completed: 0 });
+  });
+
+  it("分位数只统计跑完的流:中断的耗时不该表现为延迟下降", () => {
+    open("fast-abort");
+    recordLatencySample(db, {
+      traceId: "fast-abort",
+      route: ROUTE,
+      kind: "card",
+      cardStatus: "formal",
+      durationMs: 30, // 用户 30ms 就点了取消
+      outcome: "started",
+      now: NOW,
+    });
+    markLatencyOutcome(db, { traceId: "fast-abort", route: ROUTE, outcome: "aborted" });
+
+    open("slow-done");
+    recordLatencySample(db, {
+      traceId: "slow-done",
+      route: ROUTE,
+      kind: "card",
+      cardStatus: "formal",
+      durationMs: 4000,
+      outcome: "started",
+      now: NOW,
+    });
+    markLatencyOutcome(db, { traceId: "slow-done", route: ROUTE, outcome: "completed" });
+
+    // 只有一条 completed 进分位;把那条 30ms 算进去会把 P50 拉到 30,
+    // 看上去是「延迟大幅改善」,实际是「用户等不及跑了」。
+    const overall = latencySummary(db).overall;
+    expect(overall.samples).toBe(1);
+    expect(overall.p50).toBe(4000);
+  });
+
+  it("非流式路由不进流式分母 —— 它没有「中断」这个状态", () => {
+    recordLatencySample(db, {
+      traceId: "plain",
+      route: "consultations",
+      kind: "card",
+      cardStatus: "formal",
+      durationMs: 800,
+      now: NOW,
+    });
+    const s = latencySummary(db).stream;
+    expect(s.streams).toBe(0);
+    // 没有流时成功率是 null,不是 1 —— 「没跑过流」不能显示成「流全部成功」。
+    expect(s.successRate).toBeNull();
+  });
+
+  it("markLatencyOutcome 对不存在的流是 no-op,不凭空造分母", () => {
+    markLatencyOutcome(db, { traceId: "ghost", route: ROUTE, outcome: "completed" });
+    expect(latencySummary(db).stream.streams).toBe(0);
   });
 });

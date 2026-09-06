@@ -14,6 +14,11 @@ import {
   weekStart,
 } from "@/server/telemetry/guardrail-board";
 import { p2Breaches, retrievalBoard } from "@/server/telemetry/retrieval-log";
+import { sessionBoard, wakeupBreaches } from "@/server/telemetry/session-mix";
+import { lifecycleBoard } from "@/server/telemetry/lifecycle";
+import { degradeMatrixSummary } from "@/server/telemetry/degrade-matrix";
+import { defenseLayerBoard } from "@/server/telemetry/defense-layers";
+import { citationComplianceBoard } from "@/server/telemetry/citation-compliance";
 
 // Node runtime (node:sqlite) + always run the gold set at request time so the
 // dashboard opens on the real, current release-gate state.
@@ -44,6 +49,7 @@ export default async function OperationsPage() {
       invalidCitations: c.invalidCitations,
       provider: c.provider,
       error: c.error,
+      hitAtK: c.hitAtK,
     })),
   };
   // 运行历史与质量事件同源持久化:刷新后趋势、历史回看与事件闭环不丢失。
@@ -56,12 +62,29 @@ export default async function OperationsPage() {
   const board = guardrailBoard(db, weekStart(new Date().toISOString()));
   // 检索侧共用同一个窗口:P2 里的「SOP 覆盖率」若和护栏对不同窗,周会上没法对账。
   const retrieval = retrievalBoard(db, weekStart(new Date().toISOString()));
+  // §3 / §6 / §7 三节同样共用这个窗口。三张表的分母各不相同(会话 / 工单 / 候选),
+  // 但时间窗必须是同一个 —— 不然周会上没法说「这一周」。
+  const since = weekStart(new Date().toISOString());
+  const session = sessionBoard(db, since);
+  const lifecycle = lifecycleBoard(db, since);
+  const degrade = degradeMatrixSummary(db, since);
+  // §5 三层防线通过率:与其余护栏对共用同一个 sinceIso,周会上才能对齐同一批数。
+  const defense = defenseLayerBoard(db, since);
+  // §7 引用核实合规率:全库口径(不切窗)——文献一旦入库,合规状态不随周变化,
+  // 与「知识入库量」那一行的「全库累计」列是同一种全量口径。
+  const citationCompliance = citationComplianceBoard(db);
   const guardrail: GuardrailBoardView = {
     ...board,
     retrieval,
+    session,
+    lifecycle,
+    degrade,
+    defense,
+    citationCompliance,
     p0: p0Breaches(board),
     p1: p1Breaches(board),
-    p2: p2Breaches(retrieval),
+    // 跨周唤醒占比是 v1.1 第 11 节 P2 的第三项,和检索侧两项并进同一条 P2 通道。
+    p2: [...p2Breaches(retrieval), ...wakeupBreaches(session)],
     pendingReview: pendingReviewLoad(board),
   };
   return (

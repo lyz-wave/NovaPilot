@@ -102,6 +102,46 @@ jobs:
           runtime\node.exe node_modules\next\dist\bin\next start
           pause
           EOF
+      # ── §9 免安装包冷启动计时 ──
+      # 指标体系 v1.1 第 9 节「免安装包冷启动时间」:从解压完成到服务首次响应的耗时。
+      # 这里不解压整包(CI 里已展开),而是从「便携 Node 启动 next start」到「/ 返回 200」
+      # 的实际等待时间——这就是评委双击 启动.bat 后需要等多久。
+      # 超过 30 秒不失败,但会打印警告(硬性限制由 README「首次加载约 1-2 秒」口径决定)。
+      - name: Cold-start timing (packaged runtime)
+        shell: bash
+        working-directory: pkg/app
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            NODE_BIN="./runtime/node.exe"
+          else
+            NODE_BIN="./runtime/bin/node"
+          fi
+          # 启动服务
+          PORT=3210 "$NODE_BIN" node_modules/next/dist/bin/next start &
+          SERVER_PID=$!
+          START_MS=$(date +%s%3N 2>/dev/null || python3 -c "import time; print(int(time.time()*1000))")
+          # 等待 / 返回 200(最多 60 秒,每 500ms 重试一次)
+          READY=0
+          for i in $(seq 1 120); do
+            sleep 0.5
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3210/ --max-time 2 2>/dev/null || true)
+            if [ "$CODE" = "200" ] || [ "$CODE" = "308" ]; then
+              READY=1
+              break
+            fi
+          done
+          END_MS=$(date +%s%3N 2>/dev/null || python3 -c "import time; print(int(time.time()*1000))")
+          ELAPSED=$(( END_MS - START_MS ))
+          kill $SERVER_PID 2>/dev/null || true
+          if [ "$READY" = "1" ]; then
+            echo "冷启动完成:${ELAPSED} ms (${ELAPSED}ms from next-start to HTTP 200)"
+            if [ "$ELAPSED" -gt 30000 ]; then
+              echo "::warning ::冷启动 ${ELAPSED}ms > 30s 建议排查"
+            fi
+          else
+            echo "::error ::冷启动 60 秒内未收到 HTTP 200,服务启动失败"
+            exit 1
+          fi
       # ── B2 双保险 ──
       # 上面的 vitest 用的是 CI 自带的 Node;这里换成**打进包里的那个便携 Node**,
       # 读**打进包里的**模型字节和 .wasm,真跑一次推理。三平台各跑一次,任一平台

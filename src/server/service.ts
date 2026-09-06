@@ -7,6 +7,8 @@ import { getDb, type NovaDb } from "./db/client";
 import {
   appendMessage,
   createConversation,
+  setConversationRole,
+  setConversationClosure,
   getActiveModelConfig,
   listConversation,
   readCompactState,
@@ -28,6 +30,7 @@ import {
 import { classifyIntent } from "./agents/intent";
 import { chatReply } from "./agents/chat-agent";
 import type {
+  ClientRole,
   ContextUsage,
   ConversationTurn,
   Locale,
@@ -133,6 +136,11 @@ export interface ConsultInput {
   conversationId?: string;
   /** Recent conversation turns (oldest first) to give the Actor context. */
   history?: ChatMessage[];
+  /**
+   * 咨询者视角(第 3 节角色分布)。可选 —— 老客户端不送,已记录的画像不被抹掉。
+   * 只影响遥测口径,不进编排图:角色不该改变同一个问题的答案。
+   */
+  role?: ClientRole;
 }
 
 /** Run a consultation against the live backend and return the graph result. */
@@ -191,7 +199,9 @@ export async function respond(
 
   // Ensure the conversation index row exists (idempotent) so this thread shows
   // up in the history list even if it was created implicitly by a first turn.
-  createConversation(db, { id: conversationId, tenantId: input.tenantId, now });
+  createConversation(db, { id: conversationId, tenantId: input.tenantId, role: input.role, now });
+  // 每轮覆盖:用户中途换角色,会话的当前画像就跟着换。
+  setConversationRole(db, { id: conversationId, role: input.role });
 
   // Read the prior conversation BEFORE appending the current message, so the
   // model gets the earlier turns as context (this is what makes the assistant
@@ -241,6 +251,13 @@ export async function respond(
     result,
     traceId: input.traceId,
     now: new Date().toISOString(),
+  });
+  // 闭环判据:这一轮产出了 formal 卡 = 问题被答完了。其余处置(待补条件、
+  // 转专家)会话仍开着 —— 写 null 而不是跳过,所以再次提问会自动把闭环解除,
+  // 那正是「跨周唤醒会话」在数据上的样子。
+  setConversationClosure(db, {
+    id: conversationId,
+    closedAt: result.card.status === "formal" ? new Date().toISOString() : null,
   });
   return { ...result, kind: "card" };
 }

@@ -9,6 +9,7 @@ import {
   saveQualityEvent,
 } from "@/server/db/repositories";
 import { syncQualityEvent } from "@/server/feishu/bitable";
+import { recordDegradeTrigger } from "@/server/telemetry/degrade-matrix";
 
 // Node runtime required for node:sqlite (not available on the edge runtime).
 export const runtime = "nodejs";
@@ -59,6 +60,16 @@ export async function POST(request: Request) {
   if (body.action === "open") {
     // Idempotent: a gate that keeps failing doesn't stack duplicate events.
     const existing = findOpenQualityEvent(db, body.gateKey);
+    // 流水先落,再走去重分支 —— 顺序不能反。第 8 节要的是**触发次数**,
+    // 而事件是按闸门去重的:写在 early return 之后,一道反复抖动的闸门
+    // 只会被记一次,「触发次数」就退化成了「有几道闸门出过问题」。
+    recordDegradeTrigger(db, {
+      gateKey: body.gateKey,
+      label: body.label,
+      source: body.simulated ? "console" : "runtime",
+      deduped: !!existing,
+      now,
+    });
     if (existing) return NextResponse.json({ event: existing }, { headers });
     const event = {
       id: `QE-${body.gateKey}-${Date.now().toString(36).toUpperCase()}`,

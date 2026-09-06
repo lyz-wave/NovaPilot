@@ -166,11 +166,16 @@ function knowledgeVolume(db: NovaDb, since: string | null): KnowledgeVolume {
     since,
     since,
   );
+  // 状态取值必须和 CandidateKnowledge 的枚举对齐:
+  // 'candidate' | 'owner-approved' | 'gray-active' | 'rejected'。
+  // 这里原先写的是 status = 'approved' —— 一个本系统从不写入的值,于是
+  // candidatesApproved 恒为 0,而 pending 把已上线的 gray-active 也算成了待审。
+  // 两格都是「看起来有数、实际恒定」的死格,正是 catch 兜底最容易掩盖的那类错。
   const cands = queryOne<{ approved: number; pending: number }>(
     db,
     `SELECT
-       COALESCE(SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END), 0) AS approved,
-       COALESCE(SUM(CASE WHEN status NOT IN ('approved','rejected') THEN 1 ELSE 0 END), 0) AS pending
+       COALESCE(SUM(CASE WHEN status IN ('owner-approved','gray-active') THEN 1 ELSE 0 END), 0) AS approved,
+       COALESCE(SUM(CASE WHEN status = 'candidate' THEN 1 ELSE 0 END), 0) AS pending
      FROM candidates WHERE (? IS NULL OR created_at >= ?)`,
     since,
     since,
@@ -271,7 +276,20 @@ export function guardrailBoard(db: NovaDb, sinceIso?: string): GuardrailBoard {
     ),
     latency: safe(
       () => latencySummary(db, sinceIso),
-      { overall: { samples: 0, p50: null, p95: null, max: null }, byStatus: [] },
+      {
+        overall: { samples: 0, p50: null, p95: null, max: null },
+        byStatus: [],
+        stream: {
+          streams: 0,
+          completed: 0,
+          aborted: 0,
+          failed: 0,
+          inflight: 0,
+          // 兜底也必须是 null:一个查询失败的降级格显示「成功率 100%」,
+          // 恰好是这张看板存在的理由的反面。
+          successRate: null,
+        },
+      },
       "latencySummary",
     ),
     knowledge: safe(

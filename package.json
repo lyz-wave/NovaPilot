@@ -13,7 +13,10 @@
     "model:backfill": "vite-node -c vitest.config.ts scripts/backfill-semantic.ts",
     "model:smoke": "node scripts/smoke-semantic.mjs",
     "kb:ingest": "vite-node -c vitest.config.ts scripts/ingest-documents.ts",
-    "review:judge": "vite-node -c vitest.config.ts scripts/judge-review-samples.ts"
+    "kb:verify-citations": "vite-node -c vitest.config.ts scripts/verify-citations.ts",
+    "review:judge": "vite-node -c vitest.config.ts scripts/judge-review-samples.ts",
+    "demo:e2e": "node scripts/demo-e2e.mjs",
+    "inject:fault": "vite-node -c vitest.config.ts scripts/inject-fault.ts"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

@@ -64,14 +64,14 @@ NovaPilot is an AI-powered service system for **scientific research customer sup
 - **Version-controlled knowledge ingestion** — `data/knowledge/*.md` (frontmatter validated by zod) is ingested via `npm run kb:ingest` **behind the NovaBench gold-set regression gate**: a `stop` verdict rolls the entire batch back in one SQLite transaction, so knowledge that fails regression leaves not a single chunk behind.
 - **Guardrail-paired observability** — six instrumentation points (citation reverse-audit, interception/non-escalation review sampling, case-closure inflow, implicit adoption, end-to-end latency, per-round retrieval logs) make every incentive metric on the operations dashboard carry a guardrail metric **at the type level**, computed from one query over one time window. Retrieval logs get their own table keyed by `(traceId, round)` because the `checkpoints` primary key collapses three deepening rounds into one row, making per-round fallback rates structurally uncomputable from there.
 - **Scientific Decision Card** as the primary artifact — formal / provisional / needs-conditions / expert-review state machine (ADR-0004).
-- **Offline operation is a hard invariant** — no API key, end-to-end offline run; 405 unit tests and 14 Playwright acceptance scripts are all reproducible offline. The dense retrieval channel is **deterministically degradable** (`NP_DISABLE_SEMANTIC=1` restores bit-for-bit determinism across the whole chain); everything else is unconditionally deterministic.
+- **Offline operation is a hard invariant** — no API key, end-to-end offline run; 486 unit tests and 14 Playwright acceptance scripts are all reproducible offline. The dense retrieval channel is **deterministically degradable** (`NP_DISABLE_SEMANTIC=1` restores bit-for-bit determinism across the whole chain); everything else is unconditionally deterministic.
 
 ## Tech Stack
 
 - **Frontend**: Next.js 15 (App Router), React 19, TypeScript, zod, lucide-react
 - **Backend**: Next.js API routes, Node built-in `node:sqlite` (zero native deps), domain-driven design
 - **AI**: OpenAI-compatible model gateway (Doubao Ark / Claude / self-hosted) with offline deterministic fallback; semantic embeddings via `onnxruntime-web`'s pure-WASM backend (no native bindings — one artifact for all three platforms)
-- **Testing**: Vitest (405 tests) + Playwright (14 E2E acceptance scripts, `.xxx-check.cjs`)
+- **Testing**: Vitest (486 tests / 38 files) + Playwright (14 E2E acceptance scripts, `.xxx-check.cjs`)
 
 ## Getting Started
 
@@ -95,7 +95,7 @@ Open in browser:
 
 ### Verify
 
-    npm test            # 405 unit tests
+    npm test            # 486 unit tests / 38 files
     npm run typecheck   # tsc --noEmit
     npm run build       # production build
     npm run model:smoke # semantic smoke test (proves this machine can infer offline)

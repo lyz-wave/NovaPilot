@@ -218,10 +218,27 @@ export function saveExpertCase(
   now: string,
 ): void {
   db.prepare(
-    `INSERT INTO expert_cases(id, project_id, status, payload, created_at)
-     VALUES(?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET status = excluded.status, payload = excluded.payload`,
-  ).run(expertCase.id, projectId, expertCase.status, JSON.stringify(expertCase), now);
+    `INSERT INTO expert_cases(id, project_id, status, payload, created_at, claimed_at, resolved_at)
+     VALUES(?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       status = excluded.status,
+       payload = excluded.payload,
+       claimed_at = excluded.claimed_at,
+       -- 办结时刻**一旦写入就不再变**:退回队列再办结,记的仍是第一次办结的时刻。
+       -- 用 COALESCE(旧, 新) 而不是反过来 —— 否则「4h 实质响应」可以靠反复
+       -- 退回-重办把时钟重置,SLA 达标率就成了一个可以刷的数。
+       resolved_at = COALESCE(expert_cases.resolved_at, excluded.resolved_at)`,
+  ).run(
+    expertCase.id,
+    projectId,
+    expertCase.status,
+    JSON.stringify(expertCase),
+    now,
+    expertCase.claimedAt ?? null,
+    // 「已办结」的判据是状态,不是 resolution 文本有没有填 —— 文本可以为空,
+    // 状态是流程事实。
+    expertCase.status === "resolved" ? now : null,
+  );
 }
 
 /** One persisted expert case plus its owning project and creation time. */
@@ -301,18 +318,29 @@ export function saveCandidate(
   candidate: CandidateKnowledge,
   now: string,
 ): void {
+  // 「已发布」的判据是 status = 'gray-active'。本系统里灰度生效**就是**终态
+  // 生产可用状态,没有单独的「全量」状态 —— 所以第 7 节的「候选→全量周期」在
+  // 这里的如实口径是「候选→灰度生效周期」,聚合侧按这个名字出数,不冒充全量。
+  const live = candidate.status === "gray-active";
   db.prepare(
     `INSERT INTO candidates(id, source_case_id, statement, evidence_ids, scope,
         counterexample, owner, version, valid_until, status, production_eligible,
-        audit_trail, rollback_version, created_at)
-     VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        audit_trail, rollback_version, created_at, published_at, gray_started_at)
+     VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        statement = excluded.statement,
        scope = excluded.scope,
        status = excluded.status,
        production_eligible = excluded.production_eligible,
        audit_trail = excluded.audit_trail,
-       rollback_version = excluded.rollback_version`,
+       rollback_version = excluded.rollback_version,
+       -- 首次发布时刻只写一次:回滚不清空(那次发布真实发生过,抹掉等于篡改历史),
+       -- 二次发布也不覆盖(周期指标问的是「多久才第一次上线」)。
+       published_at = COALESCE(candidates.published_at, excluded.published_at),
+       -- 灰度窗口左端相反,**每次进灰度都重置**:回滚后再灰度是两个窗口,
+       -- 沿用旧窗口会把上一轮的质量事件算进这一轮的灰度期问题率。
+       -- 退出灰度时置回 NULL —— 窗口已关闭,再往里归因就是错配。
+       gray_started_at = excluded.gray_started_at`,
   ).run(
     candidate.id,
     candidate.sourceCaseId,
@@ -328,6 +356,8 @@ export function saveCandidate(
     JSON.stringify(candidate.auditTrail),
     candidate.rollbackVersion,
     now,
+    live ? now : null,
+    live ? now : null,
   );
 }
 
@@ -406,6 +436,8 @@ export interface StoredBenchCase {
   actual: string;
   correct: boolean;
   invalidCitations: string[];
+  /** Hit Rate@5 逐条结果。历史记录里没有这个字段时为 undefined。 */
+  hitAtK?: boolean | null;
 }
 
 export interface StoredBenchReport {
@@ -438,6 +470,7 @@ function parseStoredBenchRow(row: {
         actual?: string;
         correct?: boolean;
         invalidCitations?: string[];
+        hitAtK?: boolean | null;
       }>;
     };
     if (!Array.isArray(payload.cases) || payload.cases.length === 0) return null;
@@ -460,6 +493,7 @@ function parseStoredBenchRow(row: {
         actual: c.actual ?? "",
         correct: c.correct ?? false,
         invalidCitations: c.invalidCitations ?? [],
+        hitAtK: (c as { hitAtK?: boolean | null }).hitAtK,
       })),
       createdAt: row.created_at,
     };
@@ -498,6 +532,9 @@ export interface BenchHistoryEntry {
     // 按前者显示（"—"），把缺失当 0 就是把假安全写进趋势图。
     hallucinationLeaks?: number;
     hallucinationTotal?: number;
+    // 可选:Hit Rate@5 是后加的,历史 run 无此字段 → undefined 表示未采集。
+    hitRateAtK?: number | null;
+    hitRateTotal?: number;
   } | null;
   report: StoredBenchReport | null;
 }
@@ -840,13 +877,51 @@ export function deriveConversationTitle(text: string): string {
 /** Create a conversation row (no-op if the id already exists). */
 export function createConversation(
   db: NovaDb,
-  input: { id: string; tenantId: string; title?: string; now: string },
+  input: { id: string; tenantId: string; title?: string; role?: string | null; now: string },
 ): void {
   db.prepare(
-    `INSERT INTO conversations(id, tenant_id, title, created_at, updated_at)
-     VALUES(?, ?, ?, ?, ?)
+    `INSERT INTO conversations(id, tenant_id, title, created_at, updated_at, role)
+     VALUES(?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO NOTHING`,
-  ).run(input.id, input.tenantId, input.title ?? DEFAULT_CONVERSATION_TITLE, input.now, input.now);
+  ).run(
+    input.id,
+    input.tenantId,
+    input.title ?? DEFAULT_CONVERSATION_TITLE,
+    input.now,
+    input.now,
+    input.role ?? null,
+  );
+}
+
+/**
+ * 记录本轮的咨询者视角。每轮都覆盖 —— 用户中途从「研究生」切到「PI」,
+ * 会话的当前画像就是 PI。传 undefined 时**不动**已有值(前端没送角色的老客户端
+ * 不应该把已记录的画像抹成 NULL)。
+ */
+export function setConversationRole(
+  db: NovaDb,
+  input: { id: string; role?: string | null },
+): void {
+  if (input.role == null) return;
+  db.prepare("UPDATE conversations SET role = ? WHERE id = ?").run(input.role, input.id);
+}
+
+/**
+ * 会话闭环状态(第 3 节跨周唤醒占比)。
+ *
+ * `closedAt` 非空 = 这一轮把问题答完了(产出 formal 卡);null = 会话仍开着。
+ * 每轮都写,所以再次提问会自动把它清回 null —— 这一列表达的是**当前状态**,
+ * 不是只增不减的墓碑。墓碑式的写法会让「被唤醒的存量会话」永远算不出来,
+ * 而那恰好是这个指标要看的东西(指标体系 1.4 节)。
+ */
+export function setConversationClosure(
+  db: NovaDb,
+  input: { id: string; closedAt: string | null },
+): void {
+  db.prepare("UPDATE conversations SET closed_at = ? WHERE id = ?").run(
+    input.closedAt,
+    input.id,
+  );
 }
 
 /** Ensure a conversation exists (used when a message lands on a fresh id). */

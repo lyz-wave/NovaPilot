@@ -33,6 +33,7 @@ import {
   type IngestReport,
 } from "../src/server/rag/ingest";
 import { semanticUnavailableReason, warmupSemantic } from "../src/server/rag/semantic";
+import { checkCitationCompliance, loadProvenanceLedger } from "../src/server/rag/citation-provenance";
 import { ensureSeeded } from "../src/server/service";
 
 function flag(name: string): boolean {
@@ -62,6 +63,21 @@ if (parsed.errors.length > 0) {
 }
 if (parsed.docs.length === 0) {
   console.error(`\n${dir} 下没有可摄取的 .md 文件(以 _ 开头的文件会被跳过)。`);
+  process.exit(1);
+}
+
+// ── 1.5 引用核实合规率(硬性铁律,指标体系 v1.1 第 7 节) ──────────────────
+// 只审 source: SCI 的文献,SOP 内部规范不涉及 PMID/DOI。核实动作本身要联网,
+// 不能放在这里做——这一步只读本地台账(npm run kb:verify-citations 的产物),
+// 台账里没有 verified 记录的文献,一篇都不让入库,与 frontmatter 校验同等严格。
+const ledger = loadProvenanceLedger();
+const compliance = checkCitationCompliance(parsed.docs, ledger);
+if (compliance.violations.length > 0) {
+  console.error(`\n引用核实合规率未达标,本次不摄取(${compliance.verified}/${compliance.total} 已核实):`);
+  for (const v of compliance.violations) {
+    console.error(`  · ${v.docId} (${v.citation}): ${v.reason}`);
+  }
+  console.error(`  先跑 npm run kb:verify-citations 核实并留痕,再重新摄取。`);
   process.exit(1);
 }
 

@@ -218,6 +218,10 @@ export function NovaWorkspace({
         facts: nextFacts,
         stream: true,
         conversationId: activeConversationId,
+        // 咨询者视角。此前只活在这个组件的 useState 里,从未离开浏览器 ——
+        // 于是运营看板上「角色分布」那一格连原始数据都不存在。它只进遥测口径,
+        // 不进编排图:同一个问题不该因为选了不同身份而得到不同答案。
+        role,
       }),
       signal: controller.signal,
     });

@@ -31,6 +31,7 @@ import { saveEvalRun } from "../db/repositories";
 import { auditCitations } from "../guards/citation-audit";
 import { runHallucinationSuite, type HallucinationReport } from "./hallucination-set";
 import type { ModelGatewayConfig } from "../agents/model-gateway";
+import { search } from "../rag/retrieval";
 
 export type GoldCategory = "formal" | "clarify" | "escalate" | "provisional";
 
@@ -42,6 +43,15 @@ export interface GoldCase {
   expect: GoldCategory;
   /** True if the payload should be treated as sensitive (never egress). */
   sensitive?: boolean;
+  /**
+   * Hit Rate@5(指标体系 v1.1 第 4 节)的「期望命中文档」。可选,不是每条金标
+   * 都填得出来 —— 留空是诚实的空,不是漏填:
+   *   · G-ESC-MANUAL 问的是「谁来审」,不是任何一篇文档的内容,没有唯一正确答案;
+   *   · G-ESC-NONFFPE 的样本材料越界(新鲜冷冻组织 DNA),语料库里没有一篇文档
+   *     真的适用 —— 检索"该"命中的正确答案就是"没有",强行指定反而是灌水分子。
+   * 分母只数这里显式标注的用例,不数全部 9 条金标(见 `hitRateAtK`)。
+   */
+  expectedDocId?: string;
 }
 
 /**
@@ -56,6 +66,7 @@ export const GOLD_CASES: GoldCase[] = [
     locale: "zh",
     facts: { sampleCount: 24, dv200: 62, rnaInputNg: 25, material: "FFPE RNA" },
     expect: "formal",
+    expectedDocId: "E-SOP-042",
   },
   {
     id: "G-STD-EN",
@@ -63,6 +74,7 @@ export const GOLD_CASES: GoldCase[] = [
     locale: "en",
     facts: { sampleCount: 18, dv200: 68, rnaInputNg: 30, material: "FFPE RNA" },
     expect: "formal",
+    expectedDocId: "E-PMID-35361992",
   },
   {
     id: "G-CLR-DV200",
@@ -70,6 +82,7 @@ export const GOLD_CASES: GoldCase[] = [
     locale: "zh",
     facts: { sampleCount: 24, rnaInputNg: 25, material: "FFPE RNA" },
     expect: "clarify",
+    expectedDocId: "E-SOP-042",
   },
   {
     id: "G-CLR-INPUT",
@@ -77,6 +90,7 @@ export const GOLD_CASES: GoldCase[] = [
     locale: "zh",
     facts: { sampleCount: 12, dv200: 60, material: "FFPE RNA" },
     expect: "clarify",
+    expectedDocId: "E-SOP-042",
   },
   {
     id: "G-ESC-CONFLICT",
@@ -84,6 +98,7 @@ export const GOLD_CASES: GoldCase[] = [
     locale: "zh",
     facts: { sampleCount: 8, dv200: 55, rnaInputNg: 20, material: "FFPE RNA" },
     expect: "escalate",
+    expectedDocId: "E-SOP-042",
   },
   {
     id: "G-ESC-GREY",
@@ -91,6 +106,7 @@ export const GOLD_CASES: GoldCase[] = [
     locale: "zh",
     facts: { sampleCount: 10, dv200: 35, rnaInputNg: 15, material: "FFPE RNA" },
     expect: "escalate",
+    expectedDocId: "E-SOP-042",
   },
   {
     id: "G-ESC-MANUAL",
@@ -98,6 +114,7 @@ export const GOLD_CASES: GoldCase[] = [
     locale: "zh",
     facts: { sampleCount: 24, dv200: 60, rnaInputNg: 25, material: "FFPE RNA" },
     expect: "escalate",
+    // 无 expectedDocId:问的是「谁来审」不是任何文档内容,见 GoldCase 类型注释。
   },
   {
     id: "G-ESC-NONFFPE",
@@ -105,6 +122,7 @@ export const GOLD_CASES: GoldCase[] = [
     locale: "zh",
     facts: { sampleCount: 10, dv200: 70, rnaInputNg: 30, material: "新鲜冷冻组织 DNA" },
     expect: "escalate",
+    // 无 expectedDocId:样本材料越界,语料库里没有一篇真正适用,见 GoldCase 类型注释。
   },
   {
     id: "G-PROV-GREY",
@@ -112,6 +130,7 @@ export const GOLD_CASES: GoldCase[] = [
     locale: "zh",
     facts: { sampleCount: 16, dv200: 45, rnaInputNg: 20, material: "FFPE RNA" },
     expect: "provisional",
+    expectedDocId: "E-SOP-042",
   },
 ];
 
@@ -126,6 +145,13 @@ export interface CaseResult {
   invalidCitations: string[];
   provider: string;
   error: string | null;
+  /**
+   * Hit Rate@5 logit for this case.
+   * · `true`  — expectedDocId found in top-5 search results
+   * · `false` — expectedDocId specified but not found
+   * · `null`  — no expectedDocId defined for this case (excluded from metric)
+   */
+  hitAtK: boolean | null;
 }
 
 export interface NovaBenchMetrics {
@@ -143,6 +169,18 @@ export interface NovaBenchMetrics {
    */
   hallucinationLeaks: number;
   hallucinationTotal: number;
+  /**
+   * Hit Rate@5（指标体系 v1.1 第 4 节）。
+   *
+   * 「在前 5 条检索结果里期望文档命中过的用例数」/「标注了 expectedDocId 的用例数」。
+   * 分母只计这里显式标注的 7 条(9 条金标里有 2 条没有唯一正确答案,见 GoldCase
+   * 类型注释);分母为 0 时返回 `null`(实际不会出现,除非全部注释都被删掉)。
+   *
+   * 历史 run 无此字段 → `undefined` 表示未采集,不表示 0(与 hallucinationLeaks 同策略)。
+   */
+  hitRateAtK?: number | null;
+  /** Hit Rate@5 分母(有 expectedDocId 的用例数),供看板「N / M」展示。 */
+  hitRateTotal?: number;
 }
 
 export interface NovaBenchReport {
@@ -200,6 +238,22 @@ export async function runNovaBench(
         (v) => `${v.recommendationId}:${v.citation}`,
       );
       const actual = classify(r.card.status);
+      // ── Hit Rate@5:对每条标注了期望文档的用例做独立检索 ──
+      // 不重用编排图里的检索结果,因为那个走的是加深循环(topK 5→10→20),
+      // 口径和「top-5 精确命中率」不一样。这里用同一个查询文本,topK 固定 5。
+      let hitAtK: boolean | null = null;
+      if (gold.expectedDocId !== undefined) {
+        try {
+          const top5 = search(db, gold.question, {
+            topK: 5,
+            appliesToHint: String(gold.facts.material ?? ""),
+          });
+          hitAtK = top5.some((c) => c.documentId === gold.expectedDocId);
+        } catch {
+          // 检索失败视为未命中,不抛出,不影响其余指标。
+          hitAtK = false;
+        }
+      }
       cases.push({
         id: gold.id,
         expected: gold.expect,
@@ -211,6 +265,7 @@ export async function runNovaBench(
         invalidCitations,
         provider: r.provider,
         error: null,
+        hitAtK,
       });
     } catch (err) {
       cases.push({
@@ -224,6 +279,7 @@ export async function runNovaBench(
         invalidCitations: [],
         provider: "error",
         error: (err as Error).message,
+        hitAtK: null,
       });
     }
   }
@@ -262,6 +318,12 @@ export async function runNovaBench(
     return !!gold.sensitive && external;
   }).length;
 
+  // ── Hit Rate@5 聚合 ──
+  const hitCases = cases.filter((c) => c.hitAtK !== null);
+  const hitRateTotal = hitCases.length;
+  const hitRateAtK =
+    hitRateTotal === 0 ? null : hitCases.filter((c) => c.hitAtK === true).length / hitRateTotal;
+
   // ── 幻觉子集(第 5 节漏放率)──
   // 走同一条真实编排图,和金标集共用这次 run 的库状态,所以候选知识晋级时
   // 「回归通过」和「没放走幻觉」是对同一个知识库版本的两句话。
@@ -275,6 +337,8 @@ export async function runNovaBench(
     dataBoundaryIncidents,
     hallucinationLeaks: hallucination.leaked,
     hallucinationTotal: hallucination.total,
+    hitRateAtK,
+    hitRateTotal,
   };
   const gate = evaluateReleaseGate(metrics);
   const passed = cases.filter((c) => c.correct).length;

@@ -112,6 +112,45 @@ describe("Stage 6 · NovaBench gold-set evaluation", () => {
   });
 });
 
+describe("Stage 6 · NovaBench Hit Rate@5", () => {
+  it("报告带 hitRateAtK 字段,分母等于有 expectedDocId 的用例数", async () => {
+    const db = createDb(":memory:");
+    const report = await runNovaBench(db, OFF);
+
+    // 分母:GOLD_CASES 里有 7 条标注了 expectedDocId(2 条无)。
+    const expectedTotal = GOLD_CASES.filter((g) => g.expectedDocId !== undefined).length;
+    expect(expectedTotal).toBeGreaterThan(0); // 防止全部 expectedDocId 被误删
+    expect(report.metrics.hitRateTotal).toBe(expectedTotal);
+
+    // hitRateAtK 不应为 null(因为 hitRateTotal > 0)。
+    expect(report.metrics.hitRateAtK).not.toBeNull();
+    expect(typeof report.metrics.hitRateAtK).toBe("number");
+
+    // 逐条:标注了 expectedDocId 的用例 hitAtK 不是 null,没标注的是 null。
+    for (const c of report.cases) {
+      const gold = GOLD_CASES.find((g) => g.id === c.id)!;
+      if (gold.expectedDocId !== undefined) {
+        expect(c.hitAtK).not.toBeNull();
+        expect(typeof c.hitAtK).toBe("boolean");
+      } else {
+        expect(c.hitAtK).toBeNull();
+      }
+    }
+  });
+
+  it("hit rate 落库后历史条目里可以读回", async () => {
+    const db = createDb(":memory:");
+    const report = await runNovaBench(db, OFF);
+    const [latest] = listBenchHistory(db, 1);
+    expect(latest.metrics?.hitRateAtK).toBe(report.metrics.hitRateAtK);
+    expect(latest.metrics?.hitRateTotal).toBe(report.metrics.hitRateTotal);
+    // 逐条 hitAtK 也随报告落库。
+    const hasHitField = latest.report?.cases.some((c) => "hitAtK" in c);
+    expect(hasHitField).toBe(true);
+    db.close();
+  }, 60_000);
+});
+
 describe("Stage 6 · NovaBench 漏放率接入", () => {
   it("金标报告带上幻觉子集,且分子分母成对落库", async () => {
     const db = createDb(":memory:");

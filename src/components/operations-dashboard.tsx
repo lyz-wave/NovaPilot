@@ -26,6 +26,12 @@ interface GateMetrics {
   /** 漏放数与分母。历史 run 无此字段 → undefined 表示未评测，不表示 0。 */
   hallucinationLeaks?: number;
   hallucinationTotal?: number;
+  /**
+   * Hit Rate@5（指标体系 v1.1 第 4 节）。
+   * 历史 run 无此字段 → undefined 表示未采集，不表示 0。
+   */
+  hitRateAtK?: number | null;
+  hitRateTotal?: number;
 }
 interface GateCase {
   id: string;
@@ -38,6 +44,7 @@ interface GateCase {
   invalidCitations: string[];
   provider: string;
   error: string | null;
+  hitAtK?: boolean | null;
 }
 export interface GateReport {
   suite: string;
@@ -73,6 +80,7 @@ export interface BenchHistoryEntry {
       actual: string;
       correct: boolean;
       invalidCitations: string[];
+      hitAtK?: boolean | null;
     }>;
   } | null;
 }
@@ -148,7 +156,19 @@ export interface GuardrailBoardView {
     events: number;
     byAction: { copy: number; export: number; sync: number };
   };
-  latency: { overall: LatencyStatsView; byStatus: Array<{ status: string; stats: LatencyStatsView }> };
+  latency: {
+    overall: LatencyStatsView;
+    byStatus: Array<{ status: string; stats: LatencyStatsView }>;
+    /** 流式收场分布(§8)。分母是**开过的流**,不是跑完的流。 */
+    stream: {
+      streams: number;
+      completed: number;
+      aborted: number;
+      failed: number;
+      inflight: number;
+      successRate: number | null;
+    };
+  };
   knowledge: {
     documents: number;
     chunks: number;
@@ -188,6 +208,97 @@ export interface GuardrailBoardView {
   /** P2 · 一周内处理(第 11 节)。样本不足时为空 —— 小样本告警会被训练成噪声。 */
   p2: string[];
   pendingReview: number;
+  /**
+   * 流量与会话(§3)。分母是**当周有活动的会话**,含跨周被唤醒的存量会话 ——
+   * 用「当周新建」当分母会把这些会话排除在外,而它们的解决又算进分子。
+   */
+  session: {
+    volume: {
+      active: number;
+      created: number;
+      effective: number;
+      effectiveRate: number | null;
+      excludedTestSessions: number;
+    };
+    lensMix: Array<{ role: string; sessions: number; share: number }>;
+    roleActivity: Array<{ role: string; actions: number; source: string }>;
+    wakeup: { closed: number; crossWeek: number; rate: number | null };
+  };
+  /** 专家协同(§6)与知识演化(§7)的周期口径。 */
+  lifecycle: {
+    expert: {
+      cases: number;
+      claim: SlaView;
+      substantive: SlaView;
+      byStatus: Array<{ status: string; count: number }>;
+    };
+    knowledge: {
+      candidates: number;
+      published: number;
+      grayActive: number;
+      timeToPublishHours: DurationView;
+      publishRate: number | null;
+      rolledBack: number;
+      ingestRollbacks: number;
+      grayWindowIncidents: number;
+    };
+  };
+  /** 降级矩阵触发次数(§8「五开关各自触发次数」)。只追加,不去重。 */
+  degrade: {
+    gates: Array<{
+      gateKey: string;
+      label: string;
+      triggers: number;
+      console: number;
+      runtime: number;
+      deduped: number;
+      lastAt: string | null;
+    }>;
+    triggers: number;
+    runtimeTriggers: number;
+  };
+  /**
+   * §5 三层防线各层通过率(规则校验 / 语义复核 / NovaGuard)。规则校验与
+   * 语义复核是建议粒度,NovaGuard 是答案粒度 —— 三行分母不同,不能横向比。
+   */
+  defense: {
+    layers: Array<{
+      layer: "规则校验" | "语义复核" | "NovaGuard";
+      measured: number;
+      passed: number;
+      rate: number | null;
+    }>;
+    traces: number;
+  };
+  /**
+   * §7 引用核实合规率（硬性铁律）。口径是「入库文献（PMID/DOI）经官网核实并
+   * 留痕的比例」—— 与 `binding`（证据绑定率，运行时防编造）是两个不同的指标,
+   * 不能互相顶替：binding 答的是「这次出卡引用的证据在不在本轮检索集里」,
+   * 这里答的是「入库文献的 PMID/DOI 有没有经官网核实」。
+   */
+  citationCompliance: {
+    total: number;
+    verified: number;
+    rate: number | null;
+    violations: Array<{ docId: string; citation: string; reason: string }>;
+  };
+}
+
+export interface DurationView {
+  samples: number;
+  p50: number | null;
+  p90: number | null;
+  max: number | null;
+  mean: number | null;
+}
+
+export interface SlaView {
+  measured: number;
+  met: number;
+  rate: number | null;
+  /** 未走到这一步的案子。既不进分子也不进分母 —— 见 lifecycle.ts 的口径注释。 */
+  pending: number;
+  duration: DurationView;
 }
 
 const AUTH = "Bearer demo-research-session";const WRITE_HEADERS = {
@@ -251,6 +362,128 @@ interface RetrievalRow {
  * 每行都写清楚**分母是什么**:这一段的分母是检索轮次,和护栏对那张表的会话
  * 分母不同。没有样本一律显示 —— 与全板一致,「没测过」不能长得像「测过没问题」。
  */
+/** 咨询者视角的中文名。未记录单独成档,不并进四档里。 */
+const LENS_LABEL: Record<string, string> = {
+  pi: "PI",
+  postdoc: "博士后",
+  student: "研究生",
+  rnd: "企业研发",
+  未记录: "未记录",
+};
+
+const hoursOrDash = (value: number | null) =>
+  value == null ? "—" : value < 1 ? `${Math.round(value * 60)} 分钟` : `${value.toFixed(1)} 小时`;
+const minutesOrDash = (value: number | null) =>
+  value == null ? "—" : value < 60 ? `${Math.round(value)} 分钟` : `${(value / 60).toFixed(1)} 小时`;
+
+/**
+ * §3 / §6 / §7 三节逐行构造。
+ *
+ * 与检索那张表一样,每行都写清楚分母是什么 —— 这一段里同时存在会话、工单、
+ * 候选三种分母,不写明的话横向读一定读错。
+ */
+function lifecycleRows(g: GuardrailBoardView): RetrievalRow[] {
+  const s = g.session;
+  const e = g.lifecycle.expert;
+  const k = g.lifecycle.knowledge;
+  return [
+    {
+      metric: "周会话总量",
+      basis: "当周有活动的会话（含跨周唤醒），剔除测试账号",
+      value: `${s.volume.active} 个`,
+      reading:
+        s.volume.active === 0
+          ? "本周尚无活动会话。"
+          : `其中新建 ${s.volume.created} 个，被唤醒的存量会话 ${Math.max(0, s.volume.active - s.volume.created)} 个。`,
+    },
+    {
+      metric: "有效会话占比",
+      basis: "用户消息 ≥2 轮且非空 / 当周活动会话",
+      value: pctOrDash(s.volume.effectiveRate),
+      reading:
+        s.volume.effectiveRate == null
+          ? "无样本。判据只数用户消息 —— 助手的回复撑不起「有效」。"
+          : `${s.volume.effective}/${s.volume.active}。一问一答就走的会话不算有效。`,
+    },
+    {
+      metric: "跨周唤醒会话占比",
+      basis: "本窗口前建、本窗口内闭环 / 当周闭环会话",
+      value: pctOrDash(s.wakeup.rate),
+      reading:
+        s.wakeup.rate == null
+          ? "尚无闭环会话。闭环判据是产出正式卡，再次提问会自动解除闭环。"
+          : `${s.wakeup.crossWeek}/${s.wakeup.closed}。持续走高说明追问-补充链路过长（§11 P2）。`,
+    },
+    {
+      metric: "30 分钟认领率",
+      basis: "认领耗时 ≤ 案子自身 sla.claimMinutes / 已认领工单",
+      value: pctOrDash(e.claim.rate),
+      reading:
+        e.claim.rate == null
+          ? `无已认领工单（待认领 ${e.claim.pending} 单）。`
+          : `${e.claim.met}/${e.claim.measured}，P50 ${minutesOrDash(e.claim.duration.p50)} · P90 ${minutesOrDash(e.claim.duration.p90)}。`,
+    },
+    {
+      metric: "4 小时实质响应率",
+      basis: "办结耗时 ≤ sla.substantiveResponseHours / 已办结工单",
+      value: pctOrDash(e.substantive.rate),
+      reading:
+        e.substantive.rate == null
+          ? `无已办结工单（在办 ${e.substantive.pending} 单）。`
+          : `${e.substantive.met}/${e.substantive.measured}，P50 ${minutesOrDash(e.substantive.duration.p50)} · 最长 ${minutesOrDash(e.substantive.duration.max)}。办结时刻只写一次，退回重办不重置时钟。`,
+    },
+    {
+      metric: "候选 → 灰度生效周期",
+      basis: "首次 gray-active 时刻 − 建候选时刻",
+      value: hoursOrDash(k.timeToPublishHours.p50),
+      reading:
+        k.timeToPublishHours.samples === 0
+          ? `尚无候选上线（当前候选 ${k.candidates} 条）。`
+          : `P50 ${hoursOrDash(k.timeToPublishHours.p50)} · P90 ${hoursOrDash(k.timeToPublishHours.p90)}，样本 ${k.timeToPublishHours.samples} 条。`,
+    },
+    {
+      metric: "候选上线率",
+      basis: "曾上线候选 / 窗口内候选总数",
+      value: pctOrDash(k.publishRate),
+      reading:
+        k.publishRate == null
+          ? "窗口内无候选。"
+          : `${k.published}/${k.candidates} 曾上线，当前在灰度 ${k.grayActive} 条。回滚不减分子 —— 那次发布真实发生过。`,
+    },
+    {
+      metric: "流式会话成功率",
+      basis: "completed / 开过的流（§8）",
+      value: pctOrDash(g.latency.stream.successRate),
+      reading:
+        g.latency.stream.streams === 0
+          ? "本窗口无流式会话。"
+          : `中断 ${g.latency.stream.aborted} · 失败 ${g.latency.stream.failed} · 仍在途 ${g.latency.stream.inflight}。分母是开流那一刻落的行，不是跑完的流 —— 否则成功率恒为 100%。`,
+    },
+  ];
+}
+
+/**
+ * §5 三层防线通过率逐行构造。
+ *
+ * 规则校验、语义复核算的是**建议粒度**(一次咨询里的候选建议各自过关或
+ * 被拦);NovaGuard 算的是**答案粒度**(这张卡最终放不放行)。三行分母不
+ * 同,横向比百分比没有意义,各自只跟自己的历史值比才有意义 —— basis 列
+ * 把分母写清楚就是为了防止这种误读。
+ */
+function defenseLayerRows(g: GuardrailBoardView): RetrievalRow[] {
+  const basisByLayer: Record<string, string> = {
+    规则校验: "引用有效且在适用范围内的建议 / Critic 过手的建议数",
+    语义复核: "语义复核判定证据支撑结论的建议 / 规则校验放行的建议数",
+    NovaGuard: "四项 checks 全部合规的答案 / 做出最终判定的答案数",
+  };
+  return g.defense.layers.map((l) => ({
+    metric: l.layer,
+    basis: basisByLayer[l.layer] ?? "",
+    value: pctOrDash(l.rate),
+    reading: l.rate == null ? "无样本。" : `${l.passed}/${l.measured}。`,
+  }));
+}
+
 function retrievalRows(r: GuardrailBoardView["retrieval"]): RetrievalRow[] {
   const fallbackDetail = r.channels.fallbackReasons.length
     ? r.channels.fallbackReasons.map((x) => `${x.reason}×${x.rounds}`).join("、")
@@ -356,14 +589,22 @@ function guardrailPairs(board: GuardrailBoardView, report: GateReport): PairRow[
       incentiveValue: `本周 +${board.knowledge.documents} 篇`,
       gaming: "灌水入库",
       guardrail: "金标回归通过率 + 引用核实合规率",
-      guardrailValue: `${pct(report.accuracy)} / ${pct(board.binding.bindingRate)}`,
+      guardrailValue: `${pct(report.accuracy)} / ${pctOrDash(board.citationCompliance.rate)}`,
       verdict: "门禁制，非 KPI",
-      state: report.accuracy >= 0.9 && board.binding.bindingRate >= 1 ? "ok" : "breach",
+      state:
+        report.accuracy < 0.9
+          ? "breach"
+          : board.citationCompliance.rate == null
+            ? "watch"
+            : board.citationCompliance.rate >= 1
+              ? "ok"
+              : "breach",
       basis:
         `全库 ${board.knowledge.documentsTotal} 篇 / ${board.knowledge.chunksTotal} 段 · ` +
         `本周门禁回滚 ${board.knowledge.rolledBackRuns} 批 · ` +
         `候选已批 ${board.knowledge.candidatesApproved} 条、待审 ${board.knowledge.candidatesPending} 条 · ` +
-        `NovaBench ${report.passed}/${report.total}`,
+        `NovaBench ${report.passed}/${report.total} · ` +
+        `文献 ${board.citationCompliance.verified}/${board.citationCompliance.total} 经官网核实`,
     },
     {
       incentive: "P95 延迟",
@@ -625,6 +866,7 @@ export function OperationsDashboard({
                 actual: c.actual,
                 correct: c.correct,
                 invalidCitations: c.invalidCitations,
+                hitAtK: c.hitAtK,
               })),
             },
           },
@@ -760,6 +1002,26 @@ export function OperationsDashboard({
       note: "目标 = 0",
       simulated: degraded.has("p0-defects"),
       trend: trendSeries(history, (h) => (h.metrics ? h.metrics.p0Defects : null)),
+    },
+    {
+      label: "Hit Rate@5",
+      // hitRateAtK 与 hitRateTotal 是新字段,历史 run 可能没有 → 渲染「—」而非 0%
+      value:
+        report.metrics.hitRateAtK == null
+          ? "—"
+          : pct(report.metrics.hitRateAtK),
+      delta:
+        report.metrics.hitRateTotal == null
+          ? "N/A"
+          : String(report.cases.filter((c) => c.hitAtK === true).length) +
+            "/" +
+            String(report.metrics.hitRateTotal),
+      good: report.metrics.hitRateAtK == null ? true : report.metrics.hitRateAtK >= 0.8,
+      note: "期望文档在前 5 条检索结果内",
+      simulated: false,
+      trend: trendSeries(history, (h) =>
+        h.metrics?.hitRateAtK != null ? h.metrics.hitRateAtK : null,
+      ),
     },
   ];
 
@@ -913,6 +1175,15 @@ export function OperationsDashboard({
             {" "}judge 只做预筛，终审权在专家；judge 判定一条都不进误拦截率与该转未转率。
           </p>
           <p>
+            <b>引用核实合规率 ≠ 证据绑定率：</b>
+            {guardrail.citationCompliance.total === 0
+              ? "库内暂无 SCI 文献（PMID/DOI），这一格没有分母。"
+              : `${guardrail.citationCompliance.verified}/${guardrail.citationCompliance.total} 篇文献已经官网核实并留痕（npm run kb:verify-citations，见 data/knowledge/citation-provenance.json）。`}
+            这一格答的是「入库文献的 PMID/DOI 有没有经官网核实」，与前面 <b>可信解决率</b> 一行的
+            证据绑定率（答「出卡引用是否在本轮检索集内」，防运行时编造）是两个不同的指标，
+            此前曾被前者的数字借用充数，这里已改回各自的真实口径。
+          </p>
+          <p>
             <b>修订回流率（埋点 C）：</b>
             {pct(guardrail.inflow.inflowRate)}（办结 {guardrail.inflow.closures} 单，产出候选{" "}
             {guardrail.inflow.withCandidate} 条）。
@@ -1028,6 +1299,231 @@ export function OperationsDashboard({
         </div>
       </section>
 
+      {/* 流量与会话(§3)+ 专家协同(§6)+ 知识演化(§7)。
+          这三节此前一格数据都没有,不是因为没做聚合,是因为**表里没有列** ——
+          会话没有角色和闭环时刻,工单没有办结时刻,候选没有上线时刻。
+          v9 迁移把五个时刻/枚举列补齐,这一段是它们的第一次出数。 */}
+      <section className="guardrail-board lifecycle-board">
+        <div className="panel-heading">
+          <div>
+            <span className="eyebrow">LIFECYCLE · 指标体系 v1.1 §3 / §6 / §7</span>
+            <h2>流量、协同与知识演化周期</h2>
+          </div>
+          <span className="candidate-id">
+            当周活动会话 {guardrail.session.volume.active} 个 · 专家工单{" "}
+            {guardrail.lifecycle.expert.cases} 单
+          </span>
+        </div>
+
+        <p className="guardrail-intro">
+          这一段的分母是<b>当周有活动的会话</b>（含跨周被唤醒的存量会话），不是当周新建的会话。
+          后者会把被唤醒的老会话排除在分母外，而它们的解决又算进分子 —— 解决率就虚高了。
+          时长一律用 <b>nearest-rank 分位</b>，不用平均：一两条拖了三天的疑难案例会把均值拉到没法看。
+        </p>
+
+        <div className="pair-table" role="table" aria-label="流量与会话">
+          <div className="pair-row pair-head" role="row">
+            <span role="columnheader">指标</span>
+            <span role="columnheader">口径</span>
+            <span role="columnheader">当前值</span>
+            <span role="columnheader">读法</span>
+          </div>
+          {lifecycleRows(guardrail).map((r) => (
+            <div key={r.metric} className="pair-row" role="row">
+              <span className="pair-cell incentive" role="cell">
+                <em>{r.metric}</em>
+              </span>
+              <span className="pair-cell gaming" role="cell">{r.basis}</span>
+              <span className="pair-cell guardrail" role="cell">
+                <strong>{r.value}</strong>
+              </span>
+              <span className="pair-cell verdict" role="cell">{r.reading}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="pair-footnotes">
+          <p>
+            <b>两份「角色」不是同一个口径，不能加总：</b>
+            咨询者视角分布（
+            {guardrail.session.lensMix.length === 0
+              ? "暂无数据"
+              : guardrail.session.lensMix
+                  .map((r) => `${LENS_LABEL[r.role] ?? r.role} ${r.sessions}（${pct(r.share)}）`)
+                  .join("、")}
+            ）数的是<b>会话</b>，是用户在工作台自己选的身份，四档都落在「咨询者」这一个系统角色内部；
+            系统四角色（
+            {guardrail.session.roleActivity
+              .map((r) => `${r.role} ${r.actions}`)
+              .join("、")}
+            ）数的是<b>动作</b>，来自各自的表（{guardrail.session.roleActivity
+              .map((r) => r.source)
+              .join(" / ")}），因为只有咨询者会产生会话行。
+            单位不同，把两张表并起来算占比一定错。
+          </p>
+          <p>
+            <b>灰度期问题率的归因边界：</b>
+            <code>quality_events</code> 记的是 <code>project_id</code>，没有候选 id，
+            所以这里用「最早的灰度窗口左端」当下界统计窗口内新增事件（当前{" "}
+            {guardrail.lifecycle.knowledge.grayWindowIncidents} 起），
+            <b>不</b>逐个候选归因 —— 那样做出来的归因是编的。
+          </p>
+          <p>
+            <b>「候选 → 灰度生效周期」不是「候选 → 全量周期」：</b>
+            本系统里 <code>gray-active</code> 就是终态的生产可用状态，没有单独的「全量」状态。
+            文档第 7 节写的是全量周期，这里如实按灰度生效出数，不冒充。
+            回滚 {guardrail.lifecycle.knowledge.rolledBack} 条（曾上线、现已退出灰度）与
+            入库门禁整批回滚 {guardrail.lifecycle.knowledge.ingestRollbacks} 次是两件事，分列不合并。
+          </p>
+          <p>
+            <b>SLA 的「待办」既不进分子也不进分母：</b>
+            未认领 {guardrail.lifecycle.expert.claim.pending} 单、未办结{" "}
+            {guardrail.lifecycle.expert.substantive.pending} 单。
+            算进分母等于说「还没到期就算违约」，算进分子等于说「没办的都合规」——
+            两种都会让这一格失真，所以它自己占一格。
+            阈值取自每个案子自己的 <code>sla</code>，不是全局常量。
+          </p>
+          {guardrail.session.volume.excludedTestSessions > 0 && (
+            <p>
+              <b>已剔除测试账号会话 {guardrail.session.volume.excludedTestSessions} 个</b>
+              （租户 id 以 <code>test-</code> 开头）。剔除量必须显示出来 ——
+              否则分母是怎么变小的没有人知道。<code>novapilot-demo</code> 不算测试账号：
+              它产生的是真实的完整链路会话。
+            </p>
+          )}
+          <p>
+            <b>降级矩阵触发次数（§8 五开关）：</b>
+            {guardrail.degrade.gates
+              .map((g) => `${g.label} ${g.triggers}${g.runtime > 0 ? `（真实 ${g.runtime}）` : ""}`)
+              .join("、")}
+            。本窗口共 {guardrail.degrade.triggers} 次，其中系统自身降级{" "}
+            {guardrail.degrade.runtimeTriggers} 次、运营台演练{" "}
+            {guardrail.degrade.triggers - guardrail.degrade.runtimeTriggers} 次。
+            <b>这个数不等于未闭质量事件数</b>：开事件是按闸门去重的，
+            一道反复抖动的闸门只会挂一条待办。触发次数看抖动频次，未闭事件数看待办积压，
+            两者不能互相顶替。检索侧的两个环境开关（<code>NP_DISABLE_FTS</code> /{" "}
+            <code>NP_DISABLE_SEMANTIC</code>）不在这五开关里，它们按<b>检索轮次</b>
+            记在上一段，单位不同，不能加总。
+          </p>
+        </div>
+      </section>
+
+      <section className="guardrail-board defense-board">
+        <div className="panel-heading">
+          <div>
+            <span className="eyebrow">DEFENSE · 指标体系 v1.1 §5</span>
+            <h2>三层防线各层通过率</h2>
+          </div>
+          <span className="candidate-id">规则校验 → 语义复核 → NovaGuard · {guardrail.defense.traces} 次咨询</span>
+        </div>
+
+        <p className="guardrail-intro">
+          三层各按各的自然分母计:规则校验、语义复核数的是<b>建议</b>(一次咨询可能有好几条候选建议),
+          NovaGuard 数的是<b>答案</b>(它审的是这张卡最终放不放行)。硬凑成同一个分母,
+          会把「20 条建议全过关」和「1 条建议过关」记成同一个 100%。
+        </p>
+
+        <div className="pair-table" role="table" aria-label="三层防线各层通过率">
+          <div className="pair-row pair-head" role="row">
+            <span role="columnheader">防线层</span>
+            <span role="columnheader">口径</span>
+            <span role="columnheader">当前值</span>
+            <span role="columnheader">读法</span>
+          </div>
+          {defenseLayerRows(guardrail).map((r) => (
+            <div key={r.metric} className="pair-row" role="row">
+              <span className="pair-cell incentive" role="cell">
+                <em>{r.metric}</em>
+              </span>
+              <span className="pair-cell gaming" role="cell">{r.basis}</span>
+              <span className="pair-cell guardrail" role="cell">
+                <strong>{r.value}</strong>
+              </span>
+              <span className="pair-cell verdict" role="cell">{r.reading}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="pair-footnotes">
+          <p>
+            <b>规则校验全拦时,语义复核没有分母:</b>
+            某次咨询的建议在规则层就被全部拦下(引用无效或越出适用范围),
+            语义复核根本收不到任何建议去审 —— 这不该被记成语义层的「0% 通过」,
+            那本该是规则层的问题。
+          </p>
+          <p>
+            <b>NovaGuard 把「正确转专家」也算通过:</b>
+            风险分级审批与适用范围契约两项检查,对「正确识别风险 / 越界并转专家」
+            同样记为合规。所以这一行读的是「NovaGuard 全程没有发现任何异常」,
+            不是「答案没被转专家」——转了专家但四项检查都合规的咨询同样计入分子。
+          </p>
+          <p>
+            单层通过率突变(相对自身历史)是信号:该层可能失效,或者上游的问题分布变了。
+            这一段与 5.1 节的<b>误拦截率</b>互补 —— 那边看「拦得对不对」,这里看「各层各自放行了多少」。
+          </p>
+        </div>
+      </section>
+
+      <section className="guardrail-board citation-compliance-board">
+        <div className="panel-heading">
+          <div>
+            <span className="eyebrow">CITATION · 指标体系 v1.1 §7（硬性铁律）</span>
+            <h2>引用核实合规率</h2>
+          </div>
+          <span className="candidate-id">
+            {guardrail.citationCompliance.total === 0
+              ? "库内暂无 SCI 文献"
+              : `${guardrail.citationCompliance.verified}/${guardrail.citationCompliance.total} 已核实`}
+          </span>
+        </div>
+
+        <p className="guardrail-intro">
+          口径:入库文献（source = SCI）中 PMID/DOI <b>经官网核实并留痕</b>的比例,目标 100%。
+          核实动作要联网,与「离线可运行」的硬不变式冲突,所以拆成两步:
+          <code>npm run kb:verify-citations</code> 是唯一允许联网的维护脚本,把结果写进
+          <code>data/knowledge/citation-provenance.json</code> 台账;摄取(<code>kb:ingest</code>)、
+          种子路径与本看板都只读这个台账,不发起任何网络请求。台账里没有 verified 记录的
+          文献,摄取时会被直接拒收(与 frontmatter 校验同等严格)。
+        </p>
+
+        <div className="pair-table" role="table" aria-label="引用核实合规率">
+          <div className="pair-row pair-head" role="row">
+            <span role="columnheader">口径</span>
+            <span role="columnheader">当前值</span>
+            <span role="columnheader">读法</span>
+          </div>
+          <div className="pair-row" role="row">
+            <span className="pair-cell incentive" role="cell">
+              <em>入库文献 PMID/DOI 核实率</em>
+            </span>
+            <span className="pair-cell guardrail" role="cell">
+              <strong>{pctOrDash(guardrail.citationCompliance.rate)}</strong>
+            </span>
+            <span className="pair-cell verdict" role="cell">
+              {guardrail.citationCompliance.total === 0
+                ? "库内还没有 SCI 文献,没有分母。"
+                : `${guardrail.citationCompliance.verified}/${guardrail.citationCompliance.total} 篇。`}
+            </span>
+          </div>
+        </div>
+
+        {guardrail.citationCompliance.violations.length > 0 && (
+          <div className="pair-footnotes">
+            <p>
+              <b>未达标明细：</b>
+              {guardrail.citationCompliance.violations
+                .map((v) => `${v.docId}(${v.citation}) · ${v.reason}`)
+                .join("；")}
+              。<code>not-in-ledger</code> 是台账里压根没有这条记录,<code>unverified</code> 是
+              联网核实过但没通过(比如官网找不到该 PMID/DOI),<code>unparseable</code> 是
+              citation 字符串里抽不出标识符——这三种失败原因分列而不是合并成一个「不合规」,
+              是因为处置方式完全不同:前两种要跑一次
+              <code>npm run kb:verify-citations</code>,最后一种要先修 frontmatter。
+            </p>
+          </div>
+        )}
+      </section>
+
       <section className="bench-history">
         <div className="panel-heading">
           <div><span className="eyebrow">RUN HISTORY</span><h2>运行历史</h2></div>
@@ -1113,13 +1609,16 @@ export function OperationsDashboard({
             </button>
             {showCases && (
               <div className="case-table">
-                <div className="case-head"><span>金标案例</span><span>预期</span><span>实际</span><span>结果</span><span>违规引用</span></div>
+                <div className="case-head"><span>金标案例</span><span>预期</span><span>实际</span><span>结果</span><span>Hit@5</span><span>违规引用</span></div>
                 {report.cases.map((c) => (
                   <div key={c.id} className={"case-row" + (c.correct ? "" : " fail")}>
                     <strong>{c.id}</strong>
                     <span>{c.expected}</span>
                     <span>{c.actual}</span>
                     <em>{c.correct ? "PASS" : "FAIL"}</em>
+                    <span>
+                      {c.hitAtK == null ? "—" : c.hitAtK ? "✓" : "✗"}
+                    </span>
                     <small>{c.invalidCitations.length > 0 ? c.invalidCitations.join(" / ") : "—"}</small>
                   </div>
                 ))}

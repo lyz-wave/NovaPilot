@@ -1,0 +1,18 @@
+{
+  "pmid:35361992": {
+    "kind": "pmid",
+    "value": "35361992",
+    "status": "verified",
+    "verifiedAt": "2026-09-06T11:25:01.031Z",
+    "method": "PubMed E-utilities",
+    "note": "标题:Safety, tolerability and viral kinetics during SARS-CoV-2 human challenge in young adults."
+  },
+  "doi:10.1038/s41598-021-00042-7": {
+    "kind": "doi",
+    "value": "10.1038/s41598-021-00042-7",
+    "status": "unverified",
+    "verifiedAt": null,
+    "method": "CrossRef REST API",
+    "note": "CrossRef 返回 HTTP 404"
+  }
+}

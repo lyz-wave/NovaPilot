@@ -170,6 +170,26 @@ CREATE TABLE IF NOT EXISTS quality_events (
   created_at  TEXT NOT NULL
 );
 
+-- 降级矩阵触发流水(第 8 节「五开关各自触发次数」)。
+--
+-- 为什么不能拿 quality_events 的行数当触发次数:开事件是**按闸门去重**的
+-- (同一道闸门已有未闭事件就直接复用,见 api/quality-events)。去重对事件闭环
+-- 是对的 —— 一道一直失败的闸门不该堆出一百条待办;但它让「触发了几次」这个数
+-- 永远等于「有几道闸门出过问题」。第 8 节问的是前者,所以必须另开一张只追加的
+-- 流水表。两个数并列上板:触发次数看抖动频次,未闭事件数看待办积压。
+CREATE TABLE IF NOT EXISTS degrade_triggers (
+  id          TEXT PRIMARY KEY,
+  gate_key    TEXT NOT NULL,
+  label       TEXT NOT NULL,
+  -- console = 运营台手工注入(演示/演练);runtime = 系统自身降级。
+  -- 两者混在一起会让演练把真实降级次数冲高,所以分开记、分开出数。
+  source      TEXT NOT NULL,
+  -- 触发时是否有一条未闭事件被复用(即这一次触发被去重吃掉了)。
+  deduped     INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_degrade_triggers_gate ON degrade_triggers(gate_key, created_at);
+
 -- ── Candidate knowledge (governed evolution) ───────────────────
 CREATE TABLE IF NOT EXISTS candidates (
   id                  TEXT PRIMARY KEY,
@@ -185,7 +205,14 @@ CREATE TABLE IF NOT EXISTS candidates (
   production_eligible INTEGER NOT NULL,
   audit_trail         TEXT NOT NULL,   -- JSON
   rollback_version    TEXT,
-  created_at          TEXT NOT NULL
+  created_at          TEXT NOT NULL,
+  -- 候选→全量周期(第 7 节)。auditTrail 的条目是 {stage, actor},**没有时间戳**,
+  -- 所以「什么时候发布的」全库无记录,离线脚本也补不出来 —— 是结构性缺失,不是缺聚合。
+  -- NULL = 尚未发布;发布后回滚**不清空**它:那次发布真实发生过,清掉等于篡改历史。
+  published_at        TEXT,
+  -- 灰度期问题率(第 7 节)的窗口左端。质量事件要能关联到「哪一次灰度期内」,
+  -- 只有一个发布时刻是不够的:回滚之后再次灰度,是两个窗口。
+  gray_started_at     TEXT
 );
 
 -- ── Expert cases ───────────────────────────────────────────────
@@ -194,7 +221,13 @@ CREATE TABLE IF NOT EXISTS expert_cases (
   project_id   TEXT NOT NULL,
   status       TEXT NOT NULL,
   payload      TEXT NOT NULL,          -- full ExpertCase JSON
-  created_at   TEXT NOT NULL
+  created_at   TEXT NOT NULL,
+  -- 专家 SLA 达标率(第 6 节)。payload JSON 里有 claimedAt,但 SLA 是要按窗口
+  -- 聚合的比率,从 JSON 里捞需要全表扫 + 解析;更要命的是 resolvedAt 此前
+  -- **根本没有** —— updateExpertCase 收 resolution 文本却不记时刻,于是
+  -- 「4h 实质响应达标率」结构性不可算。两个时刻都提到列上,SQL 直接能算。
+  claimed_at   TEXT,
+  resolved_at  TEXT
 );
 
 -- ── Orchestration checkpoints (LangGraph replacement) ──────────
@@ -225,7 +258,18 @@ CREATE TABLE IF NOT EXISTS conversations (
   tenant_id   TEXT NOT NULL,
   title       TEXT NOT NULL,
   created_at  TEXT NOT NULL,
-  updated_at  TEXT NOT NULL
+  updated_at  TEXT NOT NULL,
+  -- 角色分布(第 3 节)。存的是**咨询者视角**(pi | postdoc | student | rnd) ——
+  -- 用户在角色条上自己选的那个,此前只活在前端 useState 里,从未落库。
+  -- 注意口径:指标体系第 3 节的「四角色」指的是咨询者/专家/知识管理员/运营
+  -- 这四类**系统角色**,那一份由 roleActivity() 从各自的表里算(见 session-mix.ts);
+  -- 这一列是咨询者内部的画像分布,两者不是同一个数,看板上分两格显示。
+  role        TEXT,
+  -- 会话闭环时刻(第 3 节跨周唤醒占比 + 第 11 节 P2)。
+  -- 定义:最后一轮产出了 formal 卡 = 这次咨询被答完了。下一轮再来提问时清回 NULL
+  -- (会话被重新打开)。所以它表达的是「当前是否处于已闭环状态」,而不是一个
+  -- 只增不减的墓碑 —— 后者会让「跨周唤醒」这个指标永远算不出重新打开的会话。
+  closed_at   TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_conversations_tenant ON conversations(tenant_id, updated_at);
 
@@ -412,6 +456,12 @@ CREATE TABLE IF NOT EXISTS latency_samples (
   kind         TEXT NOT NULL,            -- research | chat
   card_status  TEXT NOT NULL DEFAULT '', -- formal | expert-review | needs-conditions | ''
   duration_ms  INTEGER NOT NULL,
+  -- 流式成功率(第 8 节)。此前这一项结构性不可算:采样写在 respond() **之后**,
+  -- 中断的流一行都不落,分子分母都拿不到 —— 于是「成功率」只能由成功的样本算出来,
+  -- 恒等于 100%。改成**开流即落一行** started,收尾改 completed / failed,
+  -- 消费端断开由 ReadableStream 的 cancel() 改 aborted。
+  -- 非流式路由固定写 completed;它没有「中断」这个状态,不该混进流式分母。
+  outcome      TEXT NOT NULL DEFAULT 'completed', -- started | completed | aborted | failed
   created_at   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_latency_samples_created ON latency_samples(created_at);
@@ -454,7 +504,7 @@ CREATE INDEX IF NOT EXISTS idx_retrieval_logs_created ON retrieval_logs(created_
 CREATE INDEX IF NOT EXISTS idx_retrieval_logs_trace ON retrieval_logs(trace_id, round);
 `;
 
-export const SCHEMA_VERSION = "8";
+export const SCHEMA_VERSION = "9";
 
 /**
  * 存量库回填:FTS 表是 schema v2 新增的,老库里 chunks 已有数据但
@@ -490,5 +540,44 @@ export const ADDITIVE_COLUMNS: ReadonlyArray<{
     table: "case_memory",
     column: "provenance",
     ddl: "ALTER TABLE case_memory ADD COLUMN provenance TEXT",
+  },
+  // v9 · 生命周期时刻。这一批全部是「原本连原始数据都不存在」的指标的数据源,
+  // 补的是列不是聚合 —— 没有这些列,对应指标在离线脚本里也算不出来。
+  {
+    table: "candidates",
+    column: "published_at",
+    ddl: "ALTER TABLE candidates ADD COLUMN published_at TEXT",
+  },
+  {
+    table: "candidates",
+    column: "gray_started_at",
+    ddl: "ALTER TABLE candidates ADD COLUMN gray_started_at TEXT",
+  },
+  {
+    table: "expert_cases",
+    column: "claimed_at",
+    ddl: "ALTER TABLE expert_cases ADD COLUMN claimed_at TEXT",
+  },
+  {
+    table: "expert_cases",
+    column: "resolved_at",
+    ddl: "ALTER TABLE expert_cases ADD COLUMN resolved_at TEXT",
+  },
+  {
+    table: "conversations",
+    column: "role",
+    ddl: "ALTER TABLE conversations ADD COLUMN role TEXT",
+  },
+  {
+    table: "conversations",
+    column: "closed_at",
+    ddl: "ALTER TABLE conversations ADD COLUMN closed_at TEXT",
+  },
+  {
+    // 唯一一个带默认值的:老库里已有的样本都是「跑完了才落库」的,
+    // 按 completed 回填是对它们的如实描述。新库里 started 由开流时写入。
+    table: "latency_samples",
+    column: "outcome",
+    ddl: "ALTER TABLE latency_samples ADD COLUMN outcome TEXT NOT NULL DEFAULT 'completed'",
   },
 ];
