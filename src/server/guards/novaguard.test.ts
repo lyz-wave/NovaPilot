@@ -128,7 +128,12 @@ describe("NovaGuard · 总控门禁 runNovaGuard", () => {
       chunks,
     });
     expect(v.decision).toBe("formal");
-    expect(v.checks.map((c) => c.id)).toEqual(["evidence-bound", "risk-tier-approval", "write-contract"]);
+    expect(v.checks.map((c) => c.id)).toEqual([
+      "evidence-bound",
+      "risk-tier-approval",
+      "scope-contract",
+      "write-contract",
+    ]);
     expect(v.checks[0].passed).toBe(true);
     expect(v.trace.mustEscalate).toBe(false);
   });
@@ -145,5 +150,107 @@ describe("NovaGuard · 总控门禁 runNovaGuard", () => {
     const evidenceCheck = v.checks.find((c) => c.id === "evidence-bound")!;
     expect(evidenceCheck.passed).toBe(false);
     expect(evidenceCheck.reason).toMatch(/拦截编造引用/);
+  });
+});
+
+describe("NovaGuard · scope-contract 适用范围契约", () => {
+  const CANINE = [
+    { kind: "species" as const, demand: "犬", reason: "知识库未声明覆盖犬类。" },
+  ];
+
+  it("越界强制转专家 —— 即使证据充分、风险低、SOP 边界满足", () => {
+    const gate = guardRiskGate({
+      risk: LOW,
+      facts: { dv200: 60, rnaInputNg: 50 },
+      verifiedCount: 2,
+      blockedByConditions: false,
+      scopeViolations: CANINE,
+    });
+    // 三层防线都判「这条建议有据可依」,但请求本身不在服务范围内。
+    // 「有据」和「该答」是两件事,这一条就是把它们分开。
+    expect(gate.status).toBe("expert-review");
+    expect(gate.mustEscalate).toBe(true);
+    expect(gate.outOfScope).toBe(true);
+    expect(gate.reasons.join("")).toContain("犬");
+  });
+
+  it("越界不是「三轮耗尽」—— 交接语境不同,不能混成一个标签", () => {
+    const outOfScope = guardRiskGate({
+      risk: LOW,
+      facts: { dv200: 60, rnaInputNg: 50 },
+      verifiedCount: 2,
+      blockedByConditions: false,
+      scopeViolations: CANINE,
+    });
+    expect(outOfScope.loopExhausted).toBe(false);
+
+    // 对照组:同样转专家,但原因是检索三轮后无建议幸存。
+    const exhausted = guardRiskGate({
+      risk: LOW,
+      facts: { dv200: 60, rnaInputNg: 50 },
+      verifiedCount: 0,
+      blockedByConditions: false,
+    });
+    expect(exhausted.loopExhausted).toBe(true);
+    expect(exhausted.outOfScope).toBe(false);
+  });
+
+  it("越界优先于「等客户补条件」—— 补齐 DV200 也不会让越界请求变成范围内请求", () => {
+    const gate = guardRiskGate({
+      risk: LOW,
+      facts: {},
+      verifiedCount: 0,
+      blockedByConditions: true,
+      scopeViolations: CANINE,
+    });
+    expect(gate.status).toBe("expert-review");
+    expect(gate.status).not.toBe("needs-conditions");
+  });
+
+  it("未检出越界时不改变任何既有判定", () => {
+    const withEmpty = guardRiskGate({
+      risk: LOW,
+      facts: { dv200: 60, rnaInputNg: 50 },
+      verifiedCount: 2,
+      blockedByConditions: false,
+      scopeViolations: [],
+    });
+    const without = guardRiskGate({
+      risk: LOW,
+      facts: { dv200: 60, rnaInputNg: 50 },
+      verifiedCount: 2,
+      blockedByConditions: false,
+    });
+    expect(withEmpty).toEqual(without);
+    expect(withEmpty.status).toBe("formal");
+  });
+
+  it("门禁项在正确拦截时算通过,并把越界项写进 reason 与 trace", () => {
+    const v = runNovaGuard({
+      risk: LOW,
+      facts: { dv200: 60, rnaInputNg: 50 },
+      verifiedCount: 2,
+      blockedByConditions: false,
+      chunks: [],
+      scopeViolations: CANINE,
+    });
+    const check = v.checks.find((c) => c.id === "scope-contract")!;
+    expect(check.passed).toBe(true); // 正确拦截视为通过,与 risk-tier-approval 同口径
+    expect(check.reason).toContain("拦截越界需求");
+    expect(v.trace.scopeViolations).toEqual(["species:犬"]);
+  });
+
+  it("无越界时的 reason 明说这不是「范围内证明」", () => {
+    const v = runNovaGuard({
+      risk: LOW,
+      facts: { dv200: 60, rnaInputNg: 50 },
+      verifiedCount: 2,
+      blockedByConditions: false,
+      chunks: [],
+    });
+    const check = v.checks.find((c) => c.id === "scope-contract")!;
+    // 本体之外的物种/检测类型检不出来。把「没检出」写成「在范围内」就是又造一个
+    // 恒真指示灯,这条测试钉住那句免责说明必须在。
+    expect(check.reason).toContain("非范围内证明");
   });
 });

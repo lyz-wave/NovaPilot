@@ -9,7 +9,11 @@
  *   2. risk-tier approval 风险分级审批 —— 低风险且证据门禁通过才允许
  *      formal；中风险 provisional（暂行）；高风险/强制场景 expert-review
  *      （该转就转）；对应 ADR-0012。
- *   3. write contract 写契约 —— 认证 + 租户 + 幂等键 + 乐观并发版本
+ *   3. scope contract 适用范围契约 —— 请求的物种 / 检测类型必须落在知识库
+ *      各文档 `appliesTo` 声明的范围内，且不触碰报价 / 试剂货号 / 临床诊断
+ *      三条业务能力边界；越界即强制转专家（见 scope-contract.ts，它是被
+ *      「引用真实但答错问题」这类幻觉实测逼出来的）。
+ *   4. write contract 写契约 —— 认证 + 租户 + 幂等键 + 乐观并发版本
  *      （由 api/write-context.ts 强制执行，此处作为门禁项登记）。
  *
  * 全部为纯函数：无网络、无副作用，离线确定性可复现（对应 NovaBench
@@ -17,6 +21,7 @@
  */
 import type { RiskAssessment } from "@/domain/consultation-journey";
 import type { RetrievedChunk } from "../rag/retrieval";
+import type { ScopeViolation } from "./scope-contract";
 
 // ── 1. Evidence-bound: 引用白名单 ────────────────────────────────
 
@@ -69,6 +74,11 @@ export interface RiskGateInput {
   verifiedCount: number;
   /** True when we are only waiting on the customer to supply blocking facts. */
   blockedByConditions: boolean;
+  /**
+   * 适用范围契约违约项（scope-contract.ts）。非空即强制转专家：请求越出了知识库
+   * 声明的适用范围或业务能力边界，此时「证据充分」也不构成回答资格。
+   */
+  scopeViolations?: readonly ScopeViolation[];
 }
 
 export interface RiskGateResult {
@@ -76,6 +86,8 @@ export interface RiskGateResult {
   mustEscalate: boolean;
   /** Escalation triggered purely by loop exhaustion, not a mandatory risk. */
   loopExhausted: boolean;
+  /** 因越出适用范围/能力边界而转接（与 loopExhausted 互斥，交接语境不同）。 */
+  outOfScope: boolean;
   status: GuardDecision;
   reasons: string[];
 }
@@ -90,8 +102,15 @@ export function guardRiskGate(input: RiskGateInput): RiskGateResult {
   const meetsSopBoundary =
     facts.dv200 != null && facts.dv200 >= 50 && facts.rnaInputNg != null && facts.rnaInputNg >= 10;
 
-  const mustEscalate = risk.mandatoryEscalation || (verifiedCount === 0 && !blockedByConditions);
-  const loopExhausted = mustEscalate && !risk.mandatoryEscalation;
+  const violations = input.scopeViolations ?? [];
+  const outOfScope = violations.length > 0;
+
+  // 越界优先于 blockedByConditions：请求本身不该由这个通道回答时，去追问 DV200
+  // 是答错了问题 —— 客户补齐条件也不会让「我们不做犬类」变成「我们做」。
+  const mustEscalate =
+    risk.mandatoryEscalation || outOfScope || (verifiedCount === 0 && !blockedByConditions);
+  // 「三轮耗尽找不到证据」和「这件事不该我答」对专家是两种交接上下文，不能混。
+  const loopExhausted = mustEscalate && !risk.mandatoryEscalation && !outOfScope;
 
   const status: GuardDecision = mustEscalate
     ? "expert-review"
@@ -103,6 +122,7 @@ export function guardRiskGate(input: RiskGateInput): RiskGateResult {
 
   const reasons: string[] = [];
   if (risk.mandatoryEscalation) reasons.push(`风险信号强制转接：${risk.signals.join("、")}`);
+  if (outOfScope) reasons.push(`越出适用范围/能力边界：${violations.map((v) => v.demand).join("、")}`);
   if (loopExhausted) reasons.push("多轮检索与核验后无可靠证据支撑");
   if (status === "needs-conditions") reasons.push("缺少阻断性条件，等待客户补齐");
   if (status === "provisional") {
@@ -112,7 +132,7 @@ export function guardRiskGate(input: RiskGateInput): RiskGateResult {
   }
   if (status === "formal") reasons.push("低风险且证据门禁通过");
 
-  return { meetsSopBoundary, mustEscalate, loopExhausted, status, reasons };
+  return { meetsSopBoundary, mustEscalate, loopExhausted, outOfScope, status, reasons };
 }
 
 // ── 3. 总控门禁 ──────────────────────────────────────────────────
@@ -144,12 +164,15 @@ export function runNovaGuard(input: {
   /** 模型输出待检文本（summary / rationale），可选。 */
   modelText?: string;
   chunks: RetrievedChunk[];
+  /** 适用范围契约违约项（scope-contract.ts 的 checkScopeContract 结果）。 */
+  scopeViolations?: readonly ScopeViolation[];
 }): NovaGuardVerdict {
   const gate = guardRiskGate({
     risk: input.risk,
     facts: input.facts,
     verifiedCount: input.verifiedCount,
     blockedByConditions: input.blockedByConditions,
+    scopeViolations: input.scopeViolations,
   });
 
   const checks: GuardCheck[] = [];
@@ -183,6 +206,19 @@ export function runNovaGuard(input: {
     reason: gate.reasons.join("；"),
   });
 
+  // 适用范围契约：请求越界时必须落到 expert-review 才算这项通过。
+  // 和 risk-tier-approval 同一种口径 —— 「正确拦截」算通过，不算故障。
+  const violations = input.scopeViolations ?? [];
+  checks.push({
+    id: "scope-contract",
+    label: "适用范围契约（物种/检测类型/能力边界）",
+    passed: violations.length === 0 || gate.status === "expert-review",
+    reason:
+      violations.length === 0
+        ? "未检出越界需求（注意：本体外的物种与检测类型检不出，非范围内证明）"
+        : `拦截越界需求：${violations.map((v) => `${v.kind}·${v.demand}`).join("；")}`,
+  });
+
   checks.push({
     id: "write-contract",
     label: "写契约（认证/租户/幂等）",
@@ -195,6 +231,7 @@ export function runNovaGuard(input: {
     meetsSopBoundary: gate.meetsSopBoundary,
     mustEscalate: gate.mustEscalate,
     loopExhausted: gate.loopExhausted,
+    outOfScope: gate.outOfScope,
     status: gate.status,
     reasons: gate.reasons,
     checks,
@@ -202,6 +239,8 @@ export function runNovaGuard(input: {
       meetsSopBoundary: gate.meetsSopBoundary,
       mustEscalate: gate.mustEscalate,
       loopExhausted: gate.loopExhausted,
+      outOfScope: gate.outOfScope,
+      scopeViolations: violations.map((v) => `${v.kind}:${v.demand}`),
       verifiedCount: input.verifiedCount,
       checks: checks.map((c) => ({ id: c.id, passed: c.passed })),
     },

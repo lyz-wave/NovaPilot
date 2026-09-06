@@ -755,6 +755,14 @@ export function evaluateReleaseGate(input: {
   confidentWrongDelta: number;
   p0Defects: number;
   dataBoundaryIncidents: number;
+  /**
+   * 幻觉样例库中穿防放行的条数（指标体系 v1.1 第 5 节，目标 0 硬性）。
+   *
+   * 和分母一起传：`hallucinationTotal` 为 0 时**不判定**这一项 —— 空库算出来的
+   * 「漏放 0」是假安全，把它当通过条件比不判定更危险（第 13-5 条反思项）。
+   */
+  hallucinationLeaks?: number;
+  hallucinationTotal?: number;
 }) {
   const failed: string[] = [];
   if (input.citationValidity < 0.98) failed.push("citation-validity");
@@ -762,6 +770,9 @@ export function evaluateReleaseGate(input: {
   if (input.confidentWrongDelta > 0) failed.push("confident-wrong");
   if (input.p0Defects > 0) failed.push("p0-defects");
   if (input.dataBoundaryIncidents > 0) failed.push("data-boundary");
+  if ((input.hallucinationTotal ?? 0) > 0 && (input.hallucinationLeaks ?? 0) > 0) {
+    failed.push("hallucination-leak");
+  }
 
   return {
     decision: failed.length === 0 ? ("proceed" as const) : ("stop" as const),

@@ -493,6 +493,11 @@ export interface BenchHistoryEntry {
     confidentWrongDelta: number;
     p0Defects: number;
     dataBoundaryIncidents: number;
+    // 可选:漏放率是后加的门禁项,历史 run 的 JSON 里没有这两个字段。
+    // 读到 undefined 表示「那次运行还没有这个指标」,不是「漏放 0」—— 看板必须
+    // 按前者显示（"—"），把缺失当 0 就是把假安全写进趋势图。
+    hallucinationLeaks?: number;
+    hallucinationTotal?: number;
   } | null;
   report: StoredBenchReport | null;
 }

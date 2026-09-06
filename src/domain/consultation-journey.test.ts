@@ -230,6 +230,40 @@ describe("一次完整科研咨询旅程", () => {
     expect(gate.failed).toContain("citation-validity");
   });
 
+  it("幻觉子集放走一条即拦截上线（第 5 节：目标 0，硬性）", () => {
+    const clean = {
+      citationValidity: 1,
+      escalationRecall: 1,
+      confidentWrongDelta: 0,
+      p0Defects: 0,
+      dataBoundaryIncidents: 0,
+    };
+    const leaked = evaluateReleaseGate({ ...clean, hallucinationLeaks: 1, hallucinationTotal: 8 });
+    expect(leaked.decision).toBe("stop");
+    expect(leaked.failed).toContain("hallucination-leak");
+    expect(leaked.maxTrafficPercent).toBe(0);
+
+    const held = evaluateReleaseGate({ ...clean, hallucinationLeaks: 0, hallucinationTotal: 8 });
+    expect(held.decision).toBe("proceed");
+  });
+
+  it("分母为 0 时**不判定**漏放，而不是判它通过", () => {
+    const clean = {
+      citationValidity: 1,
+      escalationRecall: 1,
+      confidentWrongDelta: 0,
+      p0Defects: 0,
+      dataBoundaryIncidents: 0,
+    };
+    // 空样例库算出来的「漏放 0」是假安全（第 13-5 条反思项）。这里的期望是
+    // 「这一项没参与判定」——所以既不该出现在 failed 里，也不该被当成一条
+    // 已通过的门禁写进任何报告。分子分母必须成对出现才有意义。
+    const noSuite = evaluateReleaseGate({ ...clean, hallucinationLeaks: 0, hallucinationTotal: 0 });
+    expect(noSuite.failed).not.toContain("hallucination-leak");
+    const noField = evaluateReleaseGate(clean);
+    expect(noField.failed).toEqual(noSuite.failed);
+  });
+
   it("专家修改只生成候选知识，未经 Owner 与 NovaBench 不进入生产", () => {
     const candidate = createCandidateKnowledge({
       sourceCaseId: "CASE-2407",

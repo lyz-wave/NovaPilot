@@ -111,3 +111,26 @@ describe("Stage 6 · NovaBench gold-set evaluation", () => {
     expect(bad.citationValidity).toBeLessThan(0.98);
   });
 });
+
+describe("Stage 6 · NovaBench 漏放率接入", () => {
+  it("金标报告带上幻觉子集,且分子分母成对落库", async () => {
+    const db = createDb(":memory:");
+    const report = await runNovaBench(db);
+
+    // 分母跟着走:看板与自评一律「0 / 8」连着显示,不允许只显示一个 0。
+    expect(report.metrics.hallucinationTotal).toBe(report.hallucination.total);
+    expect(report.metrics.hallucinationTotal).toBeGreaterThan(0);
+    expect(report.metrics.hallucinationLeaks).toBe(report.hallucination.leaked);
+    expect(report.metrics.hallucinationLeaks).toBe(0);
+
+    // 漏放接进了发版门禁 —— 不是只在报告里躺着。
+    expect(report.gate.failed).not.toContain("hallucination-leak");
+    expect(report.gate.decision).toBe("proceed");
+
+    // 落库的历史条目也要带,否则趋势图上这一项永远是空的。
+    const [latest] = listBenchHistory(db, 1);
+    expect(latest.metrics?.hallucinationTotal).toBe(report.hallucination.total);
+    expect(latest.metrics?.hallucinationLeaks).toBe(0);
+    db.close();
+  }, 240_000);
+});

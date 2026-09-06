@@ -57,20 +57,21 @@ NovaPilot is an AI-powered service system for **scientific research customer sup
 
 - **Deterministic orchestration state machine** — a zero-dependency implementation of the stateful-graph model popularized by LangGraph (the default path does not depend on it); every node writes a DB checkpoint, so runs are inspectable and replayable. The grounding loop can additionally be driven by a **real `@langchain/langgraph` `StateGraph`** via `NP_ORCHESTRATOR=langgraph` — both paths reuse the same node functions, differential tests pin that swapping orchestrators cannot change the answer, and the package sits in `optionalDependencies` so a missing install silently falls back.
 - **Actor–Critic dual agents with a rule-authority critic** — the model only writes prose; titles, citations and boundaries are rule-derived, so hallucinated citations are impossible.
-- **Three-layer grounding defense** — retrieval grounding → rule verification → semantic review; any layer can reject a recommendation. After three failed retrieval rounds the system escalates with a full reasoning chain instead of fabricating an answer.
+- **Four-layer grounding defense** — retrieval grounding → rule verification → semantic review → **scope contract**. Any layer can reject a recommendation. After three failed retrieval rounds the system escalates with a full reasoning chain instead of fabricating an answer.
+- **Grounded ≠ relevant** — the first three layers all verify that citations are *real*; none verifies that the evidence answers *the question asked*. An 8-case adversarial subset measured this and 7 of 8 were confidently released. The fourth layer compares the question against the `appliesTo` scope each document declares — so the judgment source is the knowledge base, not a keyword blocklist. Measured separation: 0 false positives on 19 legitimate questions, 0 misses on 8 adversarial ones; end-to-end leakage 7/8 → **0/8**, wired to the P0 release gate. See `docs/B5-…`.
 - **Two-stage hybrid retrieval** — SQLite FTS5 (trigram) candidate generation → BM25 + dense-vector fusion → rerank. The dense channel runs a bundled `bge-small-zh-v1.5` (ONNX int8) on a pure-WASM backend with zero native binaries; if the model is absent the whole search **degrades wholesale** to the deterministic hash embedding and retrieval never breaks.
 - **NovaGuard trust-control layer** — evidence whitelist ("answer only with evidence"), risk-tiered approval ("escalate when needed"), and a write contract (401/403/412/428).
 - **Version-controlled knowledge ingestion** — `data/knowledge/*.md` (frontmatter validated by zod) is ingested via `npm run kb:ingest` **behind the NovaBench gold-set regression gate**: a `stop` verdict rolls the entire batch back in one SQLite transaction, so knowledge that fails regression leaves not a single chunk behind.
 - **Guardrail-paired observability** — six instrumentation points (citation reverse-audit, interception/non-escalation review sampling, case-closure inflow, implicit adoption, end-to-end latency, per-round retrieval logs) make every incentive metric on the operations dashboard carry a guardrail metric **at the type level**, computed from one query over one time window. Retrieval logs get their own table keyed by `(traceId, round)` because the `checkpoints` primary key collapses three deepening rounds into one row, making per-round fallback rates structurally uncomputable from there.
 - **Scientific Decision Card** as the primary artifact — formal / provisional / needs-conditions / expert-review state machine (ADR-0004).
-- **Offline operation is a hard invariant** — no API key, end-to-end offline run; 377 unit tests and 14 Playwright acceptance scripts are all reproducible offline. The dense retrieval channel is **deterministically degradable** (`NP_DISABLE_SEMANTIC=1` restores bit-for-bit determinism across the whole chain); everything else is unconditionally deterministic.
+- **Offline operation is a hard invariant** — no API key, end-to-end offline run; 405 unit tests and 14 Playwright acceptance scripts are all reproducible offline. The dense retrieval channel is **deterministically degradable** (`NP_DISABLE_SEMANTIC=1` restores bit-for-bit determinism across the whole chain); everything else is unconditionally deterministic.
 
 ## Tech Stack
 
 - **Frontend**: Next.js 15 (App Router), React 19, TypeScript, zod, lucide-react
 - **Backend**: Next.js API routes, Node built-in `node:sqlite` (zero native deps), domain-driven design
 - **AI**: OpenAI-compatible model gateway (Doubao Ark / Claude / self-hosted) with offline deterministic fallback; semantic embeddings via `onnxruntime-web`'s pure-WASM backend (no native bindings — one artifact for all three platforms)
-- **Testing**: Vitest (377 tests) + Playwright (14 E2E acceptance scripts, `.xxx-check.cjs`)
+- **Testing**: Vitest (405 tests) + Playwright (14 E2E acceptance scripts, `.xxx-check.cjs`)
 
 ## Getting Started
 
@@ -94,7 +95,7 @@ Open in browser:
 
 ### Verify
 
-    npm test            # 377 unit tests
+    npm test            # 405 unit tests
     npm run typecheck   # tsc --noEmit
     npm run build       # production build
     npm run model:smoke # semantic smoke test (proves this machine can infer offline)
@@ -144,6 +145,8 @@ Scripts: capability · streaming · align · composer · pin · role-lens · fac
     docs/B3-知识摄取验收记录.md        Ingestion pipeline + instrumentation + guardrail board
     docs/B4-检索日志与可选LangGraph编排验收记录.md
                                       Per-round retrieval logs (P2 alerts) + optional LangGraph orchestration
+    docs/B5-金标幻觉子集与适用范围契约验收记录.md
+                                      Adversarial hallucination subset + the 4th defense layer (7/8 → 0/8)
 
 ## ADR Highlights
 

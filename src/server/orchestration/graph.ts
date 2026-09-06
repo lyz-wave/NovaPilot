@@ -56,6 +56,11 @@ import {
 } from "../rag/case-memory";
 import { deriveScopeHint } from "../agents/actor-critic";
 import { runNovaGuard } from "../guards/novaguard";
+import {
+  buildCapabilityManifest,
+  checkScopeContract,
+  describeScopeViolations,
+} from "../guards/scope-contract";
 import type { ChatMessage, ModelGatewayConfig } from "../agents/model-gateway";
 
 export interface GraphInput {
@@ -81,6 +86,8 @@ export type GraphNode =
   | "infer-scenario"
   | "risk"
   | "clarify"
+  /** 适用范围契约:物种/检测类型/能力边界越界检查(仅在检出越界时落点)。 */
+  | "scope-contract"
   | "retrieve"
   | "draft"
   | "review"
@@ -159,6 +166,16 @@ const LOOP_EXHAUSTED_COPY: Record<Locale, string> = {
   ja: "検索と検証を複数回深掘りしても十分な根拠が得られなかったため、全推論過程と共に専門家へ引き継ぎました。",
 };
 
+// 越界转接的措辞。刻意和 LOOP_EXHAUSTED_COPY 分开:「找了三轮没找到」和「这件事
+// 不该由这个通道回答」是两种不同的交接语境,而且越界必须**当面说出越界在哪**
+// (具体理由由 describeScopeViolations 追加在后面),否则客户只会看到一句
+// 无信息量的「已转专家」,并不知道该去问谁。
+const OUT_OF_SCOPE_COPY: Record<Locale, string> = {
+  zh: "该请求越出了本知识库声明的适用范围或服务能力边界，已转交解决方案专家，AI 不就此给出方案：",
+  en: "This request falls outside the applicability scope declared by this knowledge base, or outside the service capability boundary; escalated to a solution expert and no AI recommendation is issued:",
+  ja: "本ナレッジベースが宣言する適用範囲、またはサービス能力の境界を超える依頼のため、専門家へ引き継ぎ、AI からの提案は行いません：",
+};
+
 // Grounding-loop round budget lives with the loop itself (grounding-loop.ts) so
 // both orchestrators share one definition; re-exported here for callers that
 // used to read it off this module.
@@ -231,6 +248,14 @@ export async function runConsultationGraph(
   const blockedByConditions = needsDv200 || needsInput || needsMaterial;
   const sensitive = false; // deidentified consult question
 
+  // ── 适用范围契约(NovaGuard 第 3 项)──
+  // 拿**问题本身**去比对知识库各文档声明的 appliesTo。刻意不用 baseHint:hint 是从
+  // facts 推出来的(material=FFPE RNA),所以「FFPE 样本改做单细胞」这种问法在 hint
+  // 层面完全合规 —— 那正是实测漏放 7/8 的根因。检查放在检索之前,越界请求不必再
+  // 白跑三轮加深检索。
+  const scopeViolations = checkScopeContract(input.question, buildCapabilityManifest(db));
+  if (scopeViolations.length > 0) visit("scope-contract", scopeViolations);
+
   // Similar resolved cases from prior consultations — context for the Actor,
   // never citable evidence. Empty (a no-op) until the memory has been populated.
   const similarCases = searchSimilarCases(db, {
@@ -285,8 +310,9 @@ export async function runConsultationGraph(
     blockedByConditions,
     modelText: actor.summary,
     chunks,
+    scopeViolations,
   });
-  const { meetsSopBoundary, mustEscalate, loopExhausted } = guard;
+  const { meetsSopBoundary, mustEscalate, loopExhausted, outOfScope } = guard;
   const status = guard.decision;
   visit("risk-gate", guard.trace);
 
@@ -326,17 +352,25 @@ export async function runConsultationGraph(
     confirmedConditions: factRecords,
     budgetRange: mustEscalate ? null : status === "formal" ? "¥35,000–55,000 · 以授权报价为准" : null,
     timelineRange: mustEscalate ? null : status === "formal" ? "18 天(≤30 样本) · 样本验收后确认" : null,
-    pendingItems: blockedByConditions
-      ? clarifyingQuestions.map((q) => q.prompt)
-      : mustEscalate
-        ? ["确认灰区样本的建库路线", "给出额外质控或试建库要求"]
-        : [],
+    // 越界时**不**追问 DV200/起始量 —— 客户补齐条件也不会让越界请求变成范围内
+    // 请求;要专家决定的是「这件事我们做不做、转给谁」。
+    // 待决项**必须连着理由一起写**:只写「请判定 SOP-FFPE-2099」会把一个查不到的
+    // 编号裸放在卡面上,客户会以为它是真的(幻觉子集的 echo 检查就是照这个判的)。
+    pendingItems: outOfScope
+      ? scopeViolations.map((v) => `请专家判定是否受理 · ${v.demand}:${v.reason}`)
+      : blockedByConditions
+        ? clarifyingQuestions.map((q) => q.prompt)
+        : mustEscalate
+          ? ["确认灰区样本的建库路线", "给出额外质控或试建库要求"]
+          : [],
     advisoryConfirmations: advisoryConfirmations.length ? advisoryConfirmations : undefined,
     expertStatus: mustEscalate ? "awaiting-claim" : "not-required",
     executiveSummary: mustEscalate
-      ? loopExhausted
-        ? LOOP_EXHAUSTED_COPY[input.locale]
-        : ESCALATE_COPY[input.locale]
+      ? outOfScope
+        ? `${OUT_OF_SCOPE_COPY[input.locale]}${describeScopeViolations(scopeViolations)}`
+        : loopExhausted
+          ? LOOP_EXHAUSTED_COPY[input.locale]
+          : ESCALATE_COPY[input.locale]
       : status === "formal"
         ? actor.summary || recommendations[0]?.rationale || ""
         : clarifyingQuestions[0]?.reason ?? "当前仅提供条件性判断。",
@@ -366,13 +400,17 @@ export async function runConsultationGraph(
       handoff: {
         objective: card.title,
         confirmedFacts: input.facts,
-        attemptedAction: "完成多轮混合检索与科研 Reviewer 论证核验",
+        attemptedAction: outOfScope
+          ? "适用范围契约检查判定越界，未进入证据检索"
+          : "完成多轮混合检索与科研 Reviewer 论证核验",
         riskLevel: risk.level,
-        reason: loopExhausted
-          ? LOOP_EXHAUSTED_COPY[input.locale]
-          : critic.approved
-            ? ESCALATE_COPY[input.locale]
-            : "证据核查未通过或存在冲突",
+        reason: outOfScope
+          ? `越出适用范围/能力边界：${describeScopeViolations(scopeViolations)}`
+          : loopExhausted
+            ? LOOP_EXHAUSTED_COPY[input.locale]
+            : critic.approved
+              ? ESCALATE_COPY[input.locale]
+              : "证据核查未通过或存在冲突",
         evidenceConflict: scenario === "evidence-conflict",
         decisionsNeeded: card.pendingItems,
         evidence,

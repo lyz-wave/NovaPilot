@@ -205,3 +205,69 @@ describe("Stage 4 · consultation orchestration graph", () => {
     expect(rows[0]!.verified).toBe(r.card.recommendations.length);
   });
 });
+
+describe("适用范围契约在编排图里的落点", () => {
+  let db: NovaDb;
+  beforeEach(() => {
+    db = createDb(":memory:");
+    seedKnowledgeBase(db);
+  });
+
+  it("越界请求转专家,并在卡面上说清越界在哪", async () => {
+    const r = await runConsultationGraph(
+      db,
+      base({
+        projectId: "NP-SCOPE-1",
+        traceId: "trace-scope-1",
+        question: "这批犬类FFPE肿瘤样本做转录组，参考基因组按哪套执行",
+      }),
+      OFF,
+    );
+    expect(r.card.status).toBe("expert-review");
+    expect(r.card.recommendations).toEqual([]);
+    // 一句「已转专家」没有信息量:客户得知道是因为物种不在适用范围内。
+    expect(r.card.executiveSummary).toContain("犬");
+    expect(r.card.executiveSummary).toContain("适用范围");
+    // 待决项是「要不要受理」,不是追问 DV200 —— 事实齐了也不改变越界这件事。
+    expect(r.card.pendingItems.join("")).toContain("是否受理");
+    expect(r.expertCase?.handoff.reason).toContain("越出适用范围");
+  });
+
+  it("越界时留下 scope-contract 检查点,未越界时不留", async () => {
+    const bad = await runConsultationGraph(
+      db,
+      base({ projectId: "NP-SCOPE-2", traceId: "trace-scope-2", question: "单样本报价多少元，含税吗" }),
+      OFF,
+    );
+    expect(bad.path).toContain("scope-contract");
+    const trace = getCheckpoints(db, "trace-scope-2").find((s) => s.node === "risk-gate")!.state as {
+      outOfScope: boolean;
+      scopeViolations: string[];
+    };
+    expect(trace.outOfScope).toBe(true);
+    expect(trace.scopeViolations).toContain("capability:报价与折扣");
+
+    const ok = await runConsultationGraph(
+      db,
+      base({ projectId: "NP-SCOPE-3", traceId: "trace-scope-3" }),
+      OFF,
+    );
+    expect(ok.path).not.toContain("scope-contract");
+    expect(ok.card.status).toBe("formal");
+  });
+
+  it("越界不复用「三轮耗尽」的措辞 —— 两种交接语境必须分得开", async () => {
+    const r = await runConsultationGraph(
+      db,
+      base({
+        projectId: "NP-SCOPE-4",
+        traceId: "trace-scope-4",
+        question: "这批FFPE样本改做单细胞转录组，细胞捕获率要求是多少",
+      }),
+      OFF,
+    );
+    expect(r.card.status).toBe("expert-review");
+    expect(r.card.executiveSummary).not.toContain("多轮加深检索");
+    expect(r.expertCase?.handoff.attemptedAction).toContain("未进入证据检索");
+  });
+});

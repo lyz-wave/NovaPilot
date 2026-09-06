@@ -23,6 +23,9 @@ interface GateMetrics {
   confidentWrongDelta: number;
   p0Defects: number;
   dataBoundaryIncidents: number;
+  /** 漏放数与分母。历史 run 无此字段 → undefined 表示未评测，不表示 0。 */
+  hallucinationLeaks?: number;
+  hallucinationTotal?: number;
 }
 interface GateCase {
   id: string;
@@ -457,7 +460,7 @@ const DEGRADE_OPTIONS: Array<{
   },
 ];
 
-/** 从真实指标推导六道门禁(五道硬门禁 + NovaGuard 聚合);degraded 为前端展示层注入。 */
+/** 从真实指标推导七道门禁(五道可注入硬门禁 + 幻觉漏放 + NovaGuard 聚合);degraded 仅前端注入。 */
 function deriveGates(report: GateReport, degraded: Set<string>): GateRow[] {
   const m = report.metrics;
   const base: Record<string, { value: string; pass: boolean }> = {
@@ -481,14 +484,34 @@ function deriveGates(report: GateReport, degraded: Set<string>): GateRow[] {
       simulated: injected,
     };
   });
+  // 漏放率(指标体系 v1.1 第 5 节)。**不做退化注入开关** —— 它的值来自一次真实的
+  // 对抗子集运行,伪造一个漏放数就失去了这道门禁的全部意义。
+  // 展示上分子分母必须同格显示:「0 / 8」。第 13-5 条反思项明确警告过,库太小的时候
+  // 单独一个 0 是假安全,所以这里刻意不给「0%」这种把分母藏起来的写法。
+  const hlTotal = m.hallucinationTotal;
+  const hlLeaks = m.hallucinationLeaks;
+  const hlMeasured = hlTotal != null && hlTotal > 0 && hlLeaks != null;
+  gates.push({
+    key: "hallucination-leak",
+    label: "幻觉漏放(对抗子集)",
+    // 未评测时显示「—」而不是 0:历史 run 里没有这个字段,把缺失渲染成 0
+    // 等于把假安全写进趋势。
+    value: hlMeasured ? `${hlLeaks} / ${hlTotal}` : "—",
+    pass: hlMeasured ? hlLeaks === 0 : true,
+    owner: "可信控制层 · NovaGuard",
+    evidence: hlMeasured
+      ? `必须为 0：${hlTotal} 条对抗样例(库外领域 / 虚构引用 / 未载明数值 / 用途越界)全部未被自信放行。N=${hlTotal} 偏小,该 0 值只覆盖已建样例,不构成整体安全证明。`
+      : "该次运行早于本门禁上线，未采集漏放数据（缺失按未评测显示，不按 0 计）。",
+    simulated: false,
+  });
   gates.push({
     key: "nova-guard",
     label: "NovaGuard 可信控制",
-    value: "evidence-bound / risk-tier / write-contract",
+    value: "evidence-bound / risk-tier / scope-contract / write-contract",
     pass: gates.every((g) => g.pass),
     owner: "可信控制层 · NovaGuard",
     evidence:
-      "聚合门禁：引用白名单(有据才答)、风险分级审批(该转就转)、写契约(401/403/412/428)。任一子门禁失守即拦截上线。",
+      "聚合门禁：引用白名单(有据才答)、风险分级审批(该转就转)、适用范围契约(物种/检测类型/能力边界越界即转专家)、写契约(401/403/412/428)。任一子门禁失守即拦截上线。",
     simulated: degraded.size > 0,
   });
   return gates;

@@ -13,6 +13,8 @@
  *   p0Defects            crashes / invariant violations (formal with no recs,
  *                        recommendation citing evidence outside the retrieval).
  *   dataBoundaryIncidents  sensitive payloads routed to an external model.
+ *   hallucinationLeaks   adversarial cases (hallucination-set.ts) that got past
+ *                        the defenses — always reported with its denominator.
  *
  * The metrics feed `evaluateReleaseGate`, so a broken system fails the gate.
  */
@@ -27,6 +29,7 @@ import { ensureSeeded } from "../service";
 import { runConsultationGraph } from "../orchestration/graph";
 import { saveEvalRun } from "../db/repositories";
 import { auditCitations } from "../guards/citation-audit";
+import { runHallucinationSuite, type HallucinationReport } from "./hallucination-set";
 import type { ModelGatewayConfig } from "../agents/model-gateway";
 
 export type GoldCategory = "formal" | "clarify" | "escalate" | "provisional";
@@ -131,6 +134,15 @@ export interface NovaBenchMetrics {
   confidentWrongDelta: number;
   p0Defects: number;
   dataBoundaryIncidents: number;
+  /**
+   * 幻觉样例库中穿防放行的条数（指标体系 v1.1 第 5 节，目标 0 硬性）。
+   *
+   * `hallucinationTotal` 是**分母,必须跟着一起走**。第 13-5 条反思项点名警告过
+   * 「库太小则漏放率 0 是假安全」,所以这两个字段在类型上成对出现,看板与自评
+   * 一律「0 / 8」连着显示,不允许只显示一个 0。
+   */
+  hallucinationLeaks: number;
+  hallucinationTotal: number;
 }
 
 export interface NovaBenchReport {
@@ -141,6 +153,8 @@ export interface NovaBenchReport {
   metrics: NovaBenchMetrics;
   gate: ReturnType<typeof evaluateReleaseGate>;
   cases: CaseResult[];
+  /** 幻觉子集逐条结果（分母、诱饵类型、实际处置），供看板下钻与交接包举证。 */
+  hallucination: HallucinationReport;
 }
 
 function classify(status: DecisionCard["status"]): GoldCategory {
@@ -248,12 +262,19 @@ export async function runNovaBench(
     return !!gold.sensitive && external;
   }).length;
 
+  // ── 幻觉子集(第 5 节漏放率)──
+  // 走同一条真实编排图,和金标集共用这次 run 的库状态,所以候选知识晋级时
+  // 「回归通过」和「没放走幻觉」是对同一个知识库版本的两句话。
+  const hallucination = await runHallucinationSuite(db, cfg, now);
+
   const metrics: NovaBenchMetrics = {
     citationValidity,
     escalationRecall,
     confidentWrongDelta,
     p0Defects,
     dataBoundaryIncidents,
+    hallucinationLeaks: hallucination.leaked,
+    hallucinationTotal: hallucination.total,
   };
   const gate = evaluateReleaseGate(metrics);
   const passed = cases.filter((c) => c.correct).length;
@@ -272,6 +293,7 @@ export async function runNovaBench(
       decision: gate.decision,
       metrics,
       cases,
+      hallucination,
     },
     now,
   });
@@ -284,5 +306,6 @@ export async function runNovaBench(
     metrics,
     gate,
     cases,
+    hallucination,
   };
 }

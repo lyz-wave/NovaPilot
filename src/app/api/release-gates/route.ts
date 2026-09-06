@@ -15,6 +15,10 @@ const gateSchema = z.object({
   confidentWrongDelta: z.number(),
   p0Defects: z.number().int().min(0),
   dataBoundaryIncidents: z.number().int().min(0),
+  // 漏放数必须和分母一起给。只给分子无法判断这个 0 值多少钱,所以两者要么都给、
+  // 要么都不给(不给时 evaluateReleaseGate 不判定这一项，而不是判它通过)。
+  hallucinationLeaks: z.number().int().min(0).optional(),
+  hallucinationTotal: z.number().int().min(0).optional(),
 });
 
 // Live path: run the real NovaBench gold set and gate on its derived metrics.
