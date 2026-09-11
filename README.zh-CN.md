@@ -64,7 +64,7 @@ NovaPilot 是面向**科研客户技术支持与咨询**的 AI 智能服务体�
   让运营看板的每个激励指标都**在类型层面**必须配一个护栏指标,同源同窗成对出数。检索日志按 `(traceId, round)` 单独落表,
   因为 `checkpoints` 的主键会把三轮加深检索压成一行,轮次口径的回退率从那里算不出来。
 - **科学决策卡**核心工件:formal / provisional / needs-conditions / expert-review 四态状态机(ADR-0004)。
-- **离线运行是硬不变式**:486 个单测 + 14 个 Playwright 验收脚本全部可离线复现。检索的稠密通道**可确定性降级**
+- **离线运行是硬不变式**:511+ 个单测 + 14 个 Playwright 验收脚本全部可离线复现。检索的稠密通道**可确定性降级**
   (`NP_DISABLE_SEMANTIC=1` 即回到全链路逐位确定性),其余环节无条件确定。
 
 ## 技术栈
@@ -73,7 +73,7 @@ NovaPilot 是面向**科研客户技术支持与咨询**的 AI 智能服务体�
 - **后端**:Next.js API Routes、Node 内置 `node:sqlite`(零原生依赖)、领域驱动设计
 - **AI**:OpenAI 兼容模型网关(豆包火山方舟 / Claude / 自建)带离线确定性回退;
   语义嵌入用 `onnxruntime-web` 纯 WASM 后端(无原生绑定,三平台同一份产物)
-- **测试**:Vitest(486 个单测 / 38 文件)+ Playwright(14 个 E2E 验收脚本)
+- **测试**:Vitest(511+ 个单测 / 43 文件)+ Playwright(14 个 E2E 验收脚本)
 
 ## 快速开始
 
@@ -96,7 +96,7 @@ NovaPilot 是面向**科研客户技术支持与咨询**的 AI 智能服务体�
 
 ### 质量验证
 
-    npm test            # 486 个单测 / 38 文件
+    npm test            # 511+ 个单测 / 43 文件
     npm run typecheck   # tsc --noEmit
     npm run build       # 生产构建
     npm run model:smoke # 语义向量烟雾测试(验证本机 WASM 后端可离线推理)

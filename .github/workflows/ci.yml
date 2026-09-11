@@ -1,0 +1,58 @@
+name: CI
+
+# 触发：所有 PR 和 main push。
+# ⚠️ 此 CI 绝不自动回写 docs/bench-baseline.json —— 基线只能由人工 commit 更新。
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  gate:
+    name: 5-gate CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Gate 1 — 类型检查
+      - name: typecheck
+        run: npm run typecheck
+
+      # Gate 2 — Next.js 构建
+      - name: build
+        run: npm run build
+        env:
+          # 构建时不需要真实 LLM key
+          NOVAPILOT_LLM_PROVIDER: off
+
+      # Gate 3 — 单元 / 集成测试（511+）
+      - name: test
+        run: npm test
+
+      # Gate 4 — NovaBench 金标门禁（无语义向量加速，provider=off 确定性）
+      # 此步骤产出 docs/bench-report.json，失败时仍上传供排查。
+      - name: bench:gate
+        run: npm run bench:gate
+        env:
+          NP_DISABLE_SEMANTIC: "1"
+
+      - name: Upload bench report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-report
+          path: docs/bench-report.json
+
+      # Gate 5 — 计分表与探针一致性（score:check）
+      - name: score:check
+        run: npm run score:check

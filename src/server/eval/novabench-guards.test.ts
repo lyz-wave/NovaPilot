@@ -12,8 +12,10 @@
  */
 import { describe, it, expect } from "vitest";
 import { GOLD_CASES } from "./novabench";
+import { HALLUCINATION_CASES } from "./hallucination-set";
 import { ensureSeeded } from "../service";
 import { createDb } from "../db/client";
+import provenanceMap from "../../../data/eval/case-provenance.json";
 
 describe("金标集 · expectedDocIds 护栏", () => {
   it("每条 expectedDocIds 不超过 3 个", () => {
@@ -71,6 +73,52 @@ describe("金标集 · expectedDocIds 护栏", () => {
           `${g.id} expectedDocIds 有重复`,
         ).toBe(g.expectedDocIds.length);
       }
+    }
+  });
+});
+
+describe("金标集 · provenance 多样性护栏", () => {
+  const ALL_CASES = [...GOLD_CASES.map((c) => c.id), ...HALLUCINATION_CASES.map((c) => c.id)];
+  const entries = ALL_CASES.map((id) => ({
+    id,
+    p: (provenanceMap as Record<string, { origin: string; author: string; authoredAt: string }>)[id],
+  })).filter((e) => e.p !== undefined);
+
+  it("sop-derived 案例占比 ≤ 60%", () => {
+    const sopCount = entries.filter((e) => e.p.origin === "sop-derived").length;
+    expect(
+      sopCount / entries.length,
+      `sop-derived ${sopCount}/${entries.length} 超过 60%`,
+    ).toBeLessThanOrEqual(0.6);
+  });
+
+  it("单一作者占比 ≤ 70%", () => {
+    const byAuthor = new Map<string, number>();
+    for (const { p } of entries) byAuthor.set(p.author, (byAuthor.get(p.author) ?? 0) + 1);
+    for (const [author, count] of byAuthor) {
+      expect(
+        count / entries.length,
+        `作者 "${author}" 占比 ${count}/${entries.length} 超过 70%`,
+      ).toBeLessThanOrEqual(0.7);
+    }
+  });
+
+  it("单一日期占比 ≤ 60%", () => {
+    const byDate = new Map<string, number>();
+    for (const { p } of entries) byDate.set(p.authoredAt, (byDate.get(p.authoredAt) ?? 0) + 1);
+    for (const [date, count] of byDate) {
+      expect(
+        count / entries.length,
+        `日期 "${date}" 占比 ${count}/${entries.length} 超过 60%`,
+      ).toBeLessThanOrEqual(0.6);
+    }
+  });
+
+  it("幻觉案例每种 trap 类别至少 4 条", () => {
+    const byTrap = new Map<string, number>();
+    for (const c of HALLUCINATION_CASES) byTrap.set(c.trap, (byTrap.get(c.trap) ?? 0) + 1);
+    for (const [trap, count] of byTrap) {
+      expect(count, `trap="${trap}" 仅有 ${count} 条，不足 4 条`).toBeGreaterThanOrEqual(4);
     }
   });
 });

@@ -254,7 +254,7 @@ export function guardrailBoard(db: NovaDb, sinceIso?: string): GuardrailBoard {
       {
         falseInterception: { reviewed: 0, wrong: 0, rate: null, pending: 0 },
         missedEscalation: { reviewed: 0, wrong: 0, rate: null, pending: 0 },
-        judgeAgreement: { compared: 0, agreed: 0, rate: null },
+        judgeAgreement: { compared: 0, agreed: 0, rate: null, wilsonLower: null, wilsonUpper: null },
       },
       "reviewSampleSummary",
     ),

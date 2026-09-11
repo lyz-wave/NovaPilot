@@ -15,6 +15,16 @@ import {
   Siren,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { DASHBOARD_METRIC_KEYS } from "../lib/dashboard-metric-keys";
+
+/**
+ * 本看板实际渲染的指标 key 清单，唯一来源在 `src/lib/dashboard-metric-keys.ts`。
+ * 此处 re-export 保持既有 `from "@/components/operations-dashboard"` 的导入路径可用。
+ * evidence-probes 用它判定「看板可见」——删格子而不删 key 会让 scorecard.test.ts 红，
+ * 这正是想要的。
+ */
+export { DASHBOARD_METRIC_KEYS };
+export type { DashboardMetricKey } from "../lib/dashboard-metric-keys";
 
 // Client-safe mirror of the NovaBench release report (no server-eval imports).
 interface GateMetrics {
@@ -267,7 +277,7 @@ export interface GuardrailBoardView {
    */
   defense: {
     layers: Array<{
-      layer: "规则校验" | "语义复核" | "NovaGuard";
+      layer: "规则校验" | "语义复核" | "scope-contract" | "NovaGuard";
       measured: number;
       passed: number;
       rate: number | null;
@@ -490,6 +500,7 @@ function defenseLayerRows(g: GuardrailBoardView): RetrievalRow[] {
   const basisByLayer: Record<string, string> = {
     规则校验: "引用有效且在适用范围内的建议 / Critic 过手的建议数",
     语义复核: "语义复核判定证据支撑结论的建议 / 规则校验放行的建议数",
+    "scope-contract": "scope-contract check 单独通过的答案 / 做出最终判定的答案数",
     NovaGuard: "四项 checks 全部合规的答案 / 做出最终判定的答案数",
   };
   return g.defense.layers.map((l) => ({
@@ -1452,15 +1463,15 @@ export function OperationsDashboard({
       <section className="guardrail-board defense-board">
         <div className="panel-heading">
           <div>
-            <span className="eyebrow">DEFENSE · 指标体系 v1.1 §5</span>
-            <h2>三层防线各层通过率</h2>
+            <span className="eyebrow">DEFENSE · 指标体系 v1.2 §5</span>
+            <h2>四层防线各层通过率</h2>
           </div>
-          <span className="candidate-id">规则校验 → 语义复核 → NovaGuard · {guardrail.defense.traces} 次咨询</span>
+          <span className="candidate-id">规则校验 → 语义复核 → scope-contract → NovaGuard · {guardrail.defense.traces} 次咨询</span>
         </div>
 
         <p className="guardrail-intro">
-          三层各按各的自然分母计:规则校验、语义复核数的是<b>建议</b>(一次咨询可能有好几条候选建议),
-          NovaGuard 数的是<b>答案</b>(它审的是这张卡最终放不放行)。硬凑成同一个分母,
+          四层各按各的自然分母计:规则校验、语义复核数的是<b>建议</b>(一次咨询可能有好几条候选建议),
+          scope-contract 与 NovaGuard 数的是<b>答案</b>(它审的是这张卡最终放不放行)。硬凑成同一个分母,
           会把「20 条建议全过关」和「1 条建议过关」记成同一个 100%。
         </p>
 

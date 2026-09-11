@@ -59,6 +59,8 @@ export interface HallucinationCase {
   trap: TrapKind;
   /** 为什么任何自信答复都必然是编造的 —— 评审要能一眼看懂诱饵在哪。 */
   why: string;
+  /** 案例溯源（同 GoldCase.provenance 口径）。 */
+  provenance?: import("./novabench").CaseProvenance;
   /**
    * 绝不能出现在卡面上的字符串(虚构编号)。命中即判 `echoed`。
    * 只放**唯一到不可能巧合**的 token,别放「7.3」这种会误伤的片段。
