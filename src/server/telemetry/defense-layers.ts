@@ -29,6 +29,7 @@ interface ReviewState {
   loopTrace?: LoopTraceEntryLite[];
 }
 interface GuardCheckLite {
+  id?: string;
   passed?: boolean;
 }
 interface RiskGateState {
@@ -36,7 +37,7 @@ interface RiskGateState {
 }
 
 export interface DefenseLayerRow {
-  layer: "规则校验" | "语义复核" | "NovaGuard";
+  layer: "规则校验" | "语义复核" | "scope-contract" | "NovaGuard";
   /** 该层实际经手的分母（建议数或答案数，视层而定）。 */
   measured: number;
   passed: number;
@@ -118,6 +119,33 @@ function ruleAndSemanticLayers(
 }
 
 /**
+ * scope-contract 层：答案粒度，专从 risk-gate 检查点里提取 id="scope-contract"
+ * 的那一项。分母与 NovaGuard 层相同（做出最终判定的答案数）；分子是「该项
+ * check 单独 passed」的那些——把它从 NovaGuard 汇总中拆分出来，允许独立监控
+ * 适用范围契约的合规率趋势，而不被 evidence-bound 等其他检查稀释。
+ */
+function scopeContractLayer(db: NovaDb, since: string | null): DefenseLayerRow {
+  const rows = queryAll<{ state: string }>(
+    db,
+    `SELECT state FROM checkpoints WHERE node = 'risk-gate' AND (? IS NULL OR created_at >= ?)`,
+    since,
+    since,
+  );
+
+  let measured = 0;
+  let passed = 0;
+  for (const row of rows) {
+    const checks = parseState<RiskGateState>(row.state)?.checks;
+    if (!checks || checks.length === 0) continue;
+    const sc = checks.find((c) => c.id === "scope-contract");
+    if (!sc) continue;
+    measured += 1;
+    if (sc.passed) passed += 1;
+  }
+  return { layer: "scope-contract", measured, passed, rate: rate(passed, measured) };
+}
+
+/**
  * NovaGuard：答案粒度。分母是这一窗口内做出最终判定的咨询数（每个 trace
  * 一条 risk-gate 检查点），分子是「四项 checks 全部 passed」的那些——即这次
  * 判定没有触发任何一项拦截（证据绑定 / 风险分级审批 / 适用范围契约 / 写
@@ -173,6 +201,7 @@ export function defenseLayerBoard(db: NovaDb, sinceIso?: string): DefenseLayerBo
     rule: empty("规则校验"),
     semantic: empty("语义复核"),
   });
+  const scopeContract = safe("scope-contract", () => scopeContractLayer(db, since), empty("scope-contract"));
   const guard = safe("novaguard", () => novaGuardLayer(db, since), empty("NovaGuard"));
   const traces = safe(
     "traces",
@@ -186,5 +215,5 @@ export function defenseLayerBoard(db: NovaDb, sinceIso?: string): DefenseLayerBo
     0,
   );
 
-  return { layers: [rule, semantic, guard], traces };
+  return { layers: [rule, semantic, scopeContract, guard], traces };
 }

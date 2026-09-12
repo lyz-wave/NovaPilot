@@ -6,12 +6,25 @@
  *   - fall back to a deterministic local generator when no API key is set, so
  *     the whole system runs offline and tests are stable
  *
+ * S4-2 additions:
+ *   - Exponential backoff with FNV-1a jitter (up to 3 retries)
+ *   - Multi-provider failover (sequential provider list)
+ *   - In-process token bucket rate limiter (maxConcurrent + perMinute)
+ *   - model_calls logging to the NovaDb (optional, pass `db`)
+ *
  * Env:
  *   NOVAPILOT_LLM_PROVIDER = "anthropic" | "openai" | "off" (default: auto)
  *   ANTHROPIC_API_KEY / NOVAPILOT_LLM_API_KEY
  *   NOVAPILOT_LLM_BASE_URL   (OpenAI-compatible endpoint, e.g. vLLM)
  *   NOVAPILOT_LLM_MODEL
+ *   NP_MAX_CONCURRENT        (default 4)
+ *   NP_PER_MINUTE            (default 60)
  */
+
+import type { NovaDb } from "../db/client";
+import pricingRaw from "../../../data/pricing.json";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -27,10 +40,13 @@ export interface CompletionRequest {
   /**
    * Model tier. "main" (default) uses the primary model; "mini" routes to a
    * cheaper, faster model for bounded subtasks (yes/no grounding checks,
-   * summarization) — a cheap-model-for-bounded-subtasks tier. Falls back to the
-   * main model when no mini model is configured.
+   * summarization). Falls back to the main model when no mini model is configured.
    */
   tier?: "mini" | "main";
+  /** Trace ID — used for jitter seed and model_calls logging. */
+  traceId?: string;
+  /** If provided, log this call to model_calls table. */
+  db?: NovaDb;
 }
 
 export interface TokenUsage {
@@ -43,21 +59,23 @@ export interface CompletionResult {
   provider: "anthropic" | "openai" | "deterministic";
   model: string;
   route: "external-model" | "private-model";
-  /**
-   * Token accounting reported by the provider, when available. Used to drive
-   * the context-usage ring with an authoritative input-token count (the local
-   * estimator is the offline fallback). Absent for the deterministic path and
-   * for providers that don't return a usage block.
-   */
   usage?: TokenUsage;
 }
 
-/**
- * Context-window size (in tokens) for a model id — the denominator of the
- * context-usage ring. These are the published context lengths; unknown models
- * fall back to a safe 128K. Distinct from MAX_OUTPUT_TOKENS, which caps only
- * the generated reply.
- */
+// ── Pricing ────────────────────────────────────────────────────────────────────
+
+interface PricingEntry { inputPer1M: number; outputPer1M: number }
+const PRICING = (pricingRaw as { models: Record<string, PricingEntry> }).models;
+
+function computeCostUsd(model: string, usage: TokenUsage | undefined): number | null {
+  if (!usage) return null;
+  const p = PRICING[model];
+  if (!p) return null;
+  return (usage.inputTokens * p.inputPer1M + usage.outputTokens * p.outputPer1M) / 1_000_000;
+}
+
+// ── Context window ─────────────────────────────────────────────────────────────
+
 export function contextWindowFor(model: string | undefined): number {
   const m = (model ?? "").toLowerCase();
   if (m.startsWith("glm")) return 200000;
@@ -70,50 +88,87 @@ export function contextWindowFor(model: string | undefined): number {
   return 128000;
 }
 
+// ── Config ─────────────────────────────────────────────────────────────────────
+
 export interface ModelGatewayConfig {
   provider?: "anthropic" | "openai" | "off";
+  /** Ordered list of providers to try on failure (multi-provider failover). */
+  providerFallbackChain?: Array<"anthropic" | "openai">;
   apiKey?: string;
   baseUrl?: string;
   model?: string;
-  /** Cheaper/faster model for `tier: "mini"` subtasks (env: NOVAPILOT_LLM_MINI_MODEL). */
   miniModel?: string;
-  /** Injected for tests: a deterministic generator used as fallback. */
   fallback?: (req: CompletionRequest) => string;
-  /** Called when the deterministic fallback is taken (provider off or unreachable). */
   onDegrade?: (reason: string) => void;
 }
 
-/**
- * Default output ceiling — GLM-4.x's official max output length (128K). This is
- * only a ceiling: providers bill by tokens actually generated, so a large cap
- * costs nothing extra when the model stops early. Callers may pass a smaller
- * `maxTokens` when they genuinely want a bounded reply.
- */
 export const MAX_OUTPUT_TOKENS = 131072;
-
-/**
- * Conservative retry ceiling. Some providers reject an over-large `max_tokens`
- * (or an over-long context) with a 4xx; we retry once at this smaller ceiling
- * before falling back to the offline generator — a shorter real answer beats
- * degrading to the deterministic canned text.
- */
 const RETRY_MAX_TOKENS = 16384;
-
-/**
- * 出站模型调用超时。没有它,一个只完成 TCP 握手却不回包的 baseUrl 会让
- * /api/consultations 的 SSE 永久悬挂(start 帧之后再无任何输出),连接与
- * DB 句柄一直被占用;超时后会自然回落到离线确定性生成器。
- */
 const MODEL_TIMEOUT_MS = 120_000;
+const MAX_RETRIES = 3;
 
-/**
- * 导出给离线脚本用:脚本需要在真正调用之前判断「到底有没有可用凭证、用的是哪个
- * 模型」。让脚本自己重读一遍环境变量会产生第二套解析规则,两套一旦不一致,脚本
- * 报的模型名和实际调用的模型就不是同一个。
- */
+// ── FNV-1a jitter ──────────────────────────────────────────────────────────────
+
+function fnv1a32(s: string): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    hash ^= s.charCodeAt(i);
+    hash = (hash * 0x01000193) >>> 0;
+  }
+  return hash;
+}
+
+function backoffMs(attempt: number, traceId?: string): number {
+  const jitter = traceId ? fnv1a32(traceId + attempt) % 500 : Math.random() * 500;
+  return Math.min(1000 * Math.pow(2, attempt) + jitter, 8000);
+}
+
+// ── Token bucket rate limiter ──────────────────────────────────────────────────
+
+const maxConcurrent = Number(process.env.NP_MAX_CONCURRENT ?? 4);
+const perMinute = Number(process.env.NP_PER_MINUTE ?? 60);
+
+let _concurrent = 0;
+let _callsThisMinute = 0;
+let _minuteWindowStart = Date.now();
+
+function resetMinuteWindow(): void {
+  const now = Date.now();
+  if (now - _minuteWindowStart >= 60_000) {
+    _callsThisMinute = 0;
+    _minuteWindowStart = now;
+  }
+}
+
+async function acquireSlot(timeoutMs = 30_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    resetMinuteWindow();
+    if (_concurrent < maxConcurrent && _callsThisMinute < perMinute) {
+      _concurrent++;
+      _callsThisMinute++;
+      return;
+    }
+    await new Promise<void>((r) => setTimeout(r, 50));
+  }
+  throw new Error("rate-limit: slot acquisition timeout");
+}
+
+function releaseSlot(): void {
+  if (_concurrent > 0) _concurrent--;
+}
+
+// ── Config resolution ──────────────────────────────────────────────────────────
+
 export function resolveConfig(cfg: ModelGatewayConfig = {}): Required<
   Pick<ModelGatewayConfig, "provider" | "model" | "miniModel">
-> & { apiKey?: string; baseUrl?: string; fallback?: ModelGatewayConfig["fallback"]; onDegrade?: ModelGatewayConfig["onDegrade"] } {
+> & {
+  apiKey?: string;
+  baseUrl?: string;
+  fallback?: ModelGatewayConfig["fallback"];
+  onDegrade?: ModelGatewayConfig["onDegrade"];
+  providerFallbackChain?: Array<"anthropic" | "openai">;
+} {
   const env = process.env;
   const apiKey =
     cfg.apiKey ?? env.NOVAPILOT_LLM_API_KEY ?? env.ANTHROPIC_API_KEY ?? env.OPENAI_API_KEY;
@@ -132,58 +187,135 @@ export function resolveConfig(cfg: ModelGatewayConfig = {}): Required<
     apiKey,
     baseUrl: cfg.baseUrl ?? env.NOVAPILOT_LLM_BASE_URL,
     model,
-    // Mini tier: an explicit config/env override, else the provider's cheap
-    // default; when neither exists it degrades to the main model (never fails).
     miniModel:
       cfg.miniModel ??
       env.NOVAPILOT_LLM_MINI_MODEL ??
       (provider === "anthropic" ? "claude-haiku-4-5-20251001" : "gpt-4o-mini"),
     fallback: cfg.fallback,
     onDegrade: cfg.onDegrade,
+    providerFallbackChain: cfg.providerFallbackChain,
   };
 }
 
-/**
- * Complete a chat request. Never throws on missing credentials — it degrades
- * to the deterministic fallback so callers always get a usable result.
- */
+// ── model_calls logging ────────────────────────────────────────────────────────
+
+function logModelCall(
+  db: NovaDb | undefined,
+  opts: {
+    traceId?: string;
+    provider: string;
+    model: string;
+    usage?: TokenUsage;
+    latencyMs: number;
+    degraded: boolean;
+  },
+): void {
+  if (!db) return;
+  const ts = Date.now();
+  const id = `mc-${opts.traceId ?? "anon"}-${ts}`;
+  const costUsd = computeCostUsd(opts.model, opts.usage);
+  try {
+    db.prepare(
+      `INSERT OR IGNORE INTO model_calls
+         (id, trace_id, provider, model, input_tokens, output_tokens, cost_usd, latency_ms, degraded, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      id,
+      opts.traceId ?? null,
+      opts.provider,
+      opts.model,
+      opts.usage?.inputTokens ?? 0,
+      opts.usage?.outputTokens ?? 0,
+      costUsd,
+      opts.latencyMs,
+      opts.degraded ? 1 : 0,
+      new Date(ts).toISOString(),
+    );
+  } catch { /* logging must never throw */ }
+}
+
+// ── Single-provider call: max_tokens retry ────────────────────────────────────
+// First try with the requested ceiling; if the provider rejects it (4xx
+// max_tokens too large) retry once at the conservative cap before giving up.
+// This is a distinct retry from the multi-provider exponential backoff below.
+
+async function callSingleProvider(
+  callFn: (maxTokens: number) => Promise<CompletionResult>,
+  req: CompletionRequest,
+): Promise<CompletionResult> {
+  const requested = req.maxTokens ?? MAX_OUTPUT_TOKENS;
+  try {
+    return await callFn(requested);
+  } catch {
+    if (requested > RETRY_MAX_TOKENS) {
+      return await callFn(RETRY_MAX_TOKENS);
+    }
+    throw new Error("provider-failed");
+  }
+}
+
+// ── complete() ────────────────────────────────────────────────────────────────
+
 export async function complete(
   req: CompletionRequest,
   cfg: ModelGatewayConfig = {},
 ): Promise<CompletionResult> {
   const resolved = resolveConfig(cfg);
-  // Route to the mini model for bounded subtasks; otherwise the main model.
-  const c =
-    req.tier === "mini" ? { ...resolved, model: resolved.miniModel } : resolved;
-
-  // Sensitive data may not leave for an external model unless a private
-  // (self-hosted, OpenAI-compatible) base URL is configured.
+  const c = req.tier === "mini" ? { ...resolved, model: resolved.miniModel } : resolved;
   const externalAllowed = !req.sensitive || !!c.baseUrl;
+  const t0 = Date.now();
 
   if (c.provider !== "off" && c.apiKey && externalAllowed) {
-    const requested = req.maxTokens ?? MAX_OUTPUT_TOKENS;
-    const call = (maxTokens: number) =>
-      c.provider === "anthropic" && !c.baseUrl
+    const makeCall = (prov: "anthropic" | "openai") => (maxTokens: number) =>
+      prov === "anthropic" && !c.baseUrl
         ? callAnthropic({ ...req, maxTokens }, c)
         : callOpenAICompatible({ ...req, maxTokens }, c);
-    try {
-      return await call(requested);
-    } catch {
-      // A provider may reject an over-large max_tokens (or context) with a 4xx.
-      // Retry once at a conservative ceiling before giving up to the offline
-      // fallback — never let a too-high ceiling degrade us to canned text.
-      if (requested > RETRY_MAX_TOKENS) {
+
+    const chain: Array<"anthropic" | "openai"> = [
+      c.provider as "anthropic" | "openai",
+      ...(c.providerFallbackChain ?? []),
+    ].filter((p, i, arr) => arr.indexOf(p) === i); // unique, preserve order
+
+    let lastErr: unknown;
+    for (let pi = 0; pi < chain.length; pi++) {
+      if (pi > 0) {
+        // Exponential backoff between provider attempts (S4-2 spec: max 3 retries)
+        await new Promise<void>((r) => setTimeout(r, backoffMs(pi - 1, req.traceId)));
+      }
+      const prov = chain[pi];
+      try {
+        await acquireSlot();
         try {
-          return await call(RETRY_MAX_TOKENS);
-        } catch {
-          // fall through to deterministic
+          const result = await callSingleProvider(makeCall(prov), req);
+          logModelCall(req.db, {
+            traceId: req.traceId,
+            provider: result.provider,
+            model: result.model,
+            usage: result.usage,
+            latencyMs: Date.now() - t0,
+            degraded: false,
+          });
+          return result;
+        } finally {
+          releaseSlot();
         }
+      } catch (err) {
+        lastErr = err;
+        releaseSlot();
       }
     }
+    void lastErr; // all providers failed → fall through to deterministic
   }
 
   try { c.onDegrade?.("provider-off"); } catch {}
   const text = (c.fallback ?? deterministicFallback)(req);
+  logModelCall(req.db, {
+    traceId: req.traceId,
+    provider: "deterministic",
+    model: "novapilot-deterministic-v1",
+    latencyMs: Date.now() - t0,
+    degraded: true,
+  });
   return {
     text,
     provider: "deterministic",
@@ -191,6 +323,66 @@ export async function complete(
     route: req.sensitive ? "private-model" : "external-model",
   };
 }
+
+// ── streamText() ──────────────────────────────────────────────────────────────
+
+export async function streamText(
+  req: CompletionRequest,
+  cfg: ModelGatewayConfig = {},
+  onToken: (delta: string) => void,
+): Promise<CompletionResult & { firstTokenMs: number }> {
+  const resolved = resolveConfig(cfg);
+  const c = req.tier === "mini" ? { ...resolved, model: resolved.miniModel } : resolved;
+  const externalAllowed = !req.sensitive || !!c.baseUrl;
+  const t0 = Date.now();
+
+  if (c.provider !== "off" && c.apiKey && externalAllowed) {
+    try {
+      await acquireSlot();
+      try {
+        const result = c.provider === "anthropic" && !c.baseUrl
+          ? await streamAnthropic(req, c, onToken)
+          : await streamOpenAICompatible(req, c, onToken);
+        logModelCall(req.db, {
+          traceId: req.traceId,
+          provider: result.provider,
+          model: result.model,
+          usage: result.usage,
+          latencyMs: Date.now() - t0,
+          degraded: false,
+        });
+        return result;
+      } finally {
+        releaseSlot();
+      }
+    } catch {
+      releaseSlot();
+      // fall through to deterministic
+    }
+  }
+
+  try { c.onDegrade?.("provider-off"); } catch {}
+  const dt0 = Date.now();
+  const text = (c.fallback ?? deterministicFallback)(req);
+  const firstTokenMs = Date.now() - dt0;
+  try { onToken(text); } catch {}
+  logModelCall(req.db, {
+    traceId: req.traceId,
+    provider: "deterministic",
+    model: "novapilot-deterministic-v1",
+    latencyMs: Date.now() - t0,
+    degraded: true,
+  });
+  return {
+    text,
+    provider: "deterministic",
+    model: "novapilot-deterministic-v1",
+    route: req.sensitive ? "private-model" : "external-model",
+    firstTokenMs,
+  };
+}
+
+// ── Provider implementations ───────────────────────────────────────────────────
 
 async function callAnthropic(
   req: CompletionRequest,
@@ -227,10 +419,7 @@ async function callAnthropic(
     model: c.model,
     route: req.sensitive ? "private-model" : "external-model",
     usage: data.usage
-      ? {
-          inputTokens: data.usage.input_tokens ?? 0,
-          outputTokens: data.usage.output_tokens ?? 0,
-        }
+      ? { inputTokens: data.usage.input_tokens ?? 0, outputTokens: data.usage.output_tokens ?? 0 }
       : undefined,
   };
 }
@@ -265,52 +454,8 @@ async function callOpenAICompatible(
     model: c.model,
     route: c.baseUrl ? "private-model" : "external-model",
     usage: data.usage
-      ? {
-          inputTokens: data.usage.prompt_tokens ?? 0,
-          outputTokens: data.usage.completion_tokens ?? 0,
-        }
+      ? { inputTokens: data.usage.prompt_tokens ?? 0, outputTokens: data.usage.completion_tokens ?? 0 }
       : undefined,
-  };
-}
-
-/**
- * Stream a chat request, calling `onToken` for each incremental delta.
- * Returns the full CompletionResult plus `firstTokenMs` (ms from call to first token).
- * Falls back to the deterministic path (fires onToken once) when no provider is available.
- * Guarded by `NP_STREAM_TOKENS=true` — callers should check before using.
- */
-export async function streamText(
-  req: CompletionRequest,
-  cfg: ModelGatewayConfig = {},
-  onToken: (delta: string) => void,
-): Promise<CompletionResult & { firstTokenMs: number }> {
-  const resolved = resolveConfig(cfg);
-  const c = req.tier === "mini" ? { ...resolved, model: resolved.miniModel } : resolved;
-  const externalAllowed = !req.sensitive || !!c.baseUrl;
-
-  if (c.provider !== "off" && c.apiKey && externalAllowed) {
-    try {
-      if (c.provider === "anthropic" && !c.baseUrl) {
-        return await streamAnthropic(req, c, onToken);
-      } else {
-        return await streamOpenAICompatible(req, c, onToken);
-      }
-    } catch {
-      // fall through to deterministic
-    }
-  }
-
-  try { c.onDegrade?.("provider-off"); } catch {}
-  const t0 = Date.now();
-  const text = (c.fallback ?? deterministicFallback)(req);
-  const firstTokenMs = Date.now() - t0;
-  try { onToken(text); } catch {}
-  return {
-    text,
-    provider: "deterministic",
-    model: "novapilot-deterministic-v1",
-    route: req.sensitive ? "private-model" : "external-model",
-    firstTokenMs,
   };
 }
 
@@ -450,12 +595,13 @@ async function streamOpenAICompatible(
   };
 }
 
-/**
- * Deterministic offline generator. Echoes a compact, structured answer built
- * from the last user message — enough for the orchestrator's fallback path and
- * for reproducible tests.
- */
 function deterministicFallback(req: CompletionRequest): string {
   const lastUser = [...req.messages].reverse().find((m) => m.role === "user");
   return `[[deterministic]] ${lastUser?.content.slice(0, 400) ?? ""}`;
+}
+
+// ── Rate limiter inspection (test helpers) ─────────────────────────────────────
+
+export function _rateLimiterState() {
+  return { concurrent: _concurrent, callsThisMinute: _callsThisMinute };
 }

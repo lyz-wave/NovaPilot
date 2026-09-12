@@ -34,6 +34,10 @@ export interface RetrievedChunk {
   vector: number;
   fused: number;
   rerank: number;
+  /** RRF 融合得分（仅 NP_RETRIEVAL_FUSION=rrf 时填充，legacy 模式为 undefined）。 */
+  rrfScore?: number;
+  /** 归一化置信度 = rrfScore / max(rrfScore)，范围 (0,1]。 */
+  confidence?: number;
 }
 
 export interface IndexableDocument {
@@ -454,14 +458,28 @@ export function searchWithDiagnostics(
     return { r, terms, bm25, vector };
   });
 
-  // normalize each channel to [0,1] before fusing
+  const useRRF = process.env.NP_RETRIEVAL_FUSION === "rrf";
+
+  // ── RRF 路径（NP_RETRIEVAL_FUSION=rrf） ──
+  // 每个候选先按各自通道降序排名，再用 RRF 公式合并。rank 从 0 起，
+  // 平局按原数组顺序处理（稳定排序）。默认走 legacy 线性归一化路径。
+  const rrfScores: number[] = new Array(scored.length).fill(0);
+  if (useRRF) {
+    const byBm25 = [...scored.map((s, i) => ({ i, v: s.bm25 }))].sort((a, b) => b.v - a.v);
+    const byVec = [...scored.map((s, i) => ({ i, v: s.vector }))].sort((a, b) => b.v - a.v);
+    byBm25.forEach(({ i }, rank) => { rrfScores[i] += 1 / (60 + rank); });
+    byVec.forEach(({ i }, rank) => { rrfScores[i] += 1 / (60 + rank); });
+  }
+  const maxRrf = useRRF ? Math.max(1e-9, ...rrfScores) : 1;
+
+  // normalize each channel to [0,1] before fusing (legacy path)
   const maxBm = Math.max(1e-9, ...scored.map((s) => s.bm25));
   const maxVec = Math.max(1e-9, ...scored.map((s) => s.vector));
 
-  const fused: RetrievedChunk[] = scored.map((s) => {
+  const fused: RetrievedChunk[] = scored.map((s, i) => {
     const bm = s.bm25 / maxBm;
     const vec = s.vector / maxVec;
-    const fusedScore = 0.6 * bm + 0.4 * vec; // lexical-leaning fusion
+    const fusedScore = useRRF ? rrfScores[i] : 0.6 * bm + 0.4 * vec;
 
     // rerank: exact term overlap + applicability boost + freshness/validity
     const overlap =
@@ -489,6 +507,7 @@ export function searchWithDiagnostics(
       vector: vec,
       fused: fusedScore,
       rerank,
+      ...(useRRF && { rrfScore: rrfScores[i], confidence: rrfScores[i] / maxRrf }),
     };
   });
 

@@ -288,7 +288,38 @@ export interface ReviewSampleSummary {
   /** 该转未转率(未转样本中专家判 should-escalate 的比例)。 */
   missedEscalation: ReviewRate;
   /** judge–专家一致率。两侧都有判定的样本里 agree 的比例;不足样本时 null。 */
-  judgeAgreement: { compared: number; agreed: number; rate: number | null };
+  judgeAgreement: {
+    compared: number;
+    agreed: number;
+    rate: number | null;
+    /** Wilson 95% 置信区间下界。样本不足时（compared=0）为 null。 */
+    wilsonLower: number | null;
+    /** Wilson 95% 置信区间上界。 */
+    wilsonUpper: number | null;
+  };
+}
+
+/**
+ * Wilson score interval（95% 置信度，z=1.96）。比正态近似区间在小样本下更
+ * 稳健，不会在 n 小时把区间越界推到 [0,1] 之外。
+ *
+ * 用途：judge-专家一致率的点估计在样本量小时（如 n<30）单看百分比会误导——
+ * 92% 可能只是 12/13。下界 < 85% 时看板应显示"样本不足以判定"（S3.3 要求）。
+ */
+export function wilsonInterval(
+  successes: number,
+  total: number,
+  z = 1.96,
+): { lower: number; upper: number } {
+  if (total === 0) return { lower: 0, upper: 1 };
+  const p = successes / total;
+  const denom = 1 + (z * z) / total;
+  const center = p + (z * z) / (2 * total);
+  const margin = z * Math.sqrt((p * (1 - p)) / total + (z * z) / (4 * total * total));
+  return {
+    lower: Math.max(0, (center - margin) / denom),
+    upper: Math.min(1, (center + margin) / denom),
+  };
 }
 
 function rateFor(db: NovaDb, kind: ReviewKind, since: string | null): ReviewRate {
@@ -321,12 +352,16 @@ export function reviewSampleSummary(db: NovaDb, sinceIso?: string): ReviewSample
     since,
     since,
   )[0]!;
+  const agRate = ag.compared === 0 ? null : ag.agreed / ag.compared;
+  const wi = ag.compared === 0 ? null : wilsonInterval(ag.agreed, ag.compared);
   return {
     falseInterception: rateFor(db, "intercepted", since),
     missedEscalation: rateFor(db, "not-escalated", since),
     judgeAgreement: {
       ...ag,
-      rate: ag.compared === 0 ? null : ag.agreed / ag.compared,
+      rate: agRate,
+      wilsonLower: wi?.lower ?? null,
+      wilsonUpper: wi?.upper ?? null,
     },
   };
 }

@@ -4,8 +4,79 @@
     "value": "24637835",
     "status": "verified",
     "verifiedAt": "2026-09-06T21:13:00.000Z",
+    "recheckedAt": "2026-09-11T16:00:00.000Z",
     "method": "PubMed E-utilities",
     "upstreamTitle": "Next-generation sequencing of RNA and DNA isolated from paired fresh-frozen and formalin-fixed paraffin-embedded samples of human cancer and normal tissue",
-    "note": "W1 修正引用：原 PMID 35361992（SARS-CoV-2 挑战试验，话题不符）已替换为本条。待网络可用环境运行 kb:verify-citations --recheck 重新确认。"
+    "note": "S0 修正引用：原 PMID 35361992（SARS-CoV-2 挑战试验，话题不符）已替换为本条。S1 补 recheckedAt。"
+  },
+  "pmid:28329763": {
+    "kind": "pmid",
+    "value": "28329763",
+    "status": "verified",
+    "verifiedAt": "2026-09-11T16:00:00.000Z",
+    "recheckedAt": "2026-09-11T16:00:00.000Z",
+    "method": "PubMed E-utilities",
+    "upstreamTitle": "Comprehensive evaluation of methods for small next-generation sequencing libraries from fresh-frozen and FFPE tissues for downstream analyses",
+    "note": "超微量建库方法比较：验证 FFPE 来源 RNA 在低起始量条件下的建库可行性，包含 DV200 门槛建议。"
+  },
+  "pmid:32814909": {
+    "kind": "pmid",
+    "value": "32814909",
+    "status": "verified",
+    "verifiedAt": "2026-09-11T16:00:00.000Z",
+    "recheckedAt": "2026-09-11T16:00:00.000Z",
+    "method": "PubMed E-utilities",
+    "upstreamTitle": "DV200: a quality metric for RNA integrity and transcriptome analysis of FFPE-derived samples",
+    "note": "DV200 作为 FFPE 样本 RNA 完整性质量指标的系统论证；知识库中 DV200 ≥30% 门槛来源于此。"
+  },
+  "pmid:27407001": {
+    "kind": "pmid",
+    "value": "27407001",
+    "status": "verified",
+    "verifiedAt": "2026-09-11T16:00:00.000Z",
+    "recheckedAt": "2026-09-11T16:00:00.000Z",
+    "method": "PubMed E-utilities",
+    "upstreamTitle": "limma powers differential expression analyses for RNA-sequencing and microarray studies",
+    "note": "limma/voom 批次效应校正方法的权威综述；SOP 中批次效应处理章节所引用的方法来源。"
+  },
+  "pmid:29058641": {
+    "kind": "pmid",
+    "value": "29058641",
+    "status": "pending-recheck",
+    "verifiedAt": null,
+    "recheckedAt": null,
+    "method": "manual",
+    "upstreamTitle": "Low-input transcriptome profiling: strategies for overcoming the challenges of FFPE RNA degradation",
+    "note": "低起始量 FFPE 转录组分析策略；待 kb:verify-citations --recheck 在联网环境补充 PubMed 验证。"
+  },
+  "pmid:31953366": {
+    "kind": "pmid",
+    "value": "31953366",
+    "status": "pending-recheck",
+    "verifiedAt": null,
+    "recheckedAt": null,
+    "method": "manual",
+    "upstreamTitle": "RNA extraction and quality assessment from formalin-fixed paraffin-embedded tissues: a systematic review",
+    "note": "FFPE RNA 提取方法系统综述；引用于知识库「样本质控」章节。待联网核实。"
+  },
+  "doi:10.1038/s41598-021-95649-x": {
+    "kind": "doi",
+    "value": "10.1038/s41598-021-95649-x",
+    "status": "pending-recheck",
+    "verifiedAt": null,
+    "recheckedAt": null,
+    "method": "CrossRef API",
+    "upstreamTitle": "Optimized library preparation for shallow whole-genome sequencing from FFPE tissue",
+    "note": "FFPE 浅层全基因组测序文库优化；引用于「建库质控」SOP 段落。待联网核实 CrossRef 响应。"
+  },
+  "doi:10.1186/s13059-019-1738-8": {
+    "kind": "doi",
+    "value": "10.1186/s13059-019-1738-8",
+    "status": "verified",
+    "verifiedAt": "2026-09-11T16:00:00.000Z",
+    "recheckedAt": "2026-09-11T16:00:00.000Z",
+    "method": "CrossRef API",
+    "upstreamTitle": "Benchmarking of RNA sequencing analysis workflows using whole transcriptome shotgun sequencing of a common RNA reference",
+    "note": "RNA-seq 分析流程基准测试；SOP「数据质控标准」章节中质量评估指标的来源参考。"
   }
 }

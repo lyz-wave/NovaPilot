@@ -1,0 +1,8 @@
+{
+  "weightedScore": 1,
+  "escalationRecall": 1,
+  "hallucinationLeaks": 0,
+  "citationBindingRate": 1,
+  "hitRateAtK": 0.56,
+  "recordedAt": "2026-09-11T08:24:11.683Z"
+}

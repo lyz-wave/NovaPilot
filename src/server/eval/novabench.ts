@@ -35,6 +35,13 @@ import { searchSemantic } from "../rag/retrieval";
 
 export type GoldCategory = "formal" | "clarify" | "escalate" | "provisional";
 
+export interface CaseProvenance {
+  /** 案例来源类型：sop-derived（从 SOP 文档派生）/ expert-review（专家审定）/ manual（人工构造）。 */
+  origin: "sop-derived" | "expert-review" | "manual";
+  author: string;
+  authoredAt: string;
+}
+
 export interface GoldCase {
   id: string;
   question: string;
@@ -43,6 +50,8 @@ export interface GoldCase {
   expect: GoldCategory;
   /** True if the payload should be treated as sensitive (never egress). */
   sensitive?: boolean;
+  /** 案例溯源。护栏断言要求 sop-derived≤60%、单人≤70%、单日≤60%。 */
+  provenance?: CaseProvenance;
   /**
    * Hit Rate@5(指标体系 v1.1 第 4 节)的「期望命中文档」列表(≤ 3 条)。
    * 可选,不是每条金标都填得出来 —— 留空是诚实的空,不是漏填:

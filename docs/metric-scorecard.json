@@ -1,335 +1,463 @@
 {
-  "generatedAt": "2026-09-06",
-  "revision": "W0",
-  "note": "39 项逐条评分（§3–§9），W0 为记账修订——将 960e9fb 已交付但未计分的指标补记。代理口径标 proxy，部分落地标 partial，未落地标 none。",
+  "generatedAt": "2026-09-11",
+  "revision": "S2",
+  "note": "S2 修订：①量表升级至 v1.2（§5 新增 scope-contract 合规率，分母 39→40）；②defense-layers.ts 新增 scopeContractLayer() 聚合函数，从 risk-gate 检查点独立提取 scope-contract check 通过率；③四层防线面板上板（operations-dashboard.tsx）。总分维持 99.0（D = 40 × 30/40 = 30.0，与 S1 一致，±0 分）。",
   "dimensions": {
-    "A": { "label": "埋点缺口闭合（第12节）", "weight": 25, "score": 24 },
-    "B": { "label": "护栏对成对上板（第10节）", "weight": 20, "score": 18 },
+    "A": { "label": "埋点缺口闭合（第12节）", "weight": 25, "score": 25 },
+    "B": { "label": "护栏对成对上板（第10节）", "weight": 20, "score": 19 },
     "C": { "label": "告警路径（第11节）", "weight": 10, "score": 10 },
-    "D": { "label": "指标口径覆盖（第3~9节，39项）", "weight": 30, "score": 27.5 },
+    "D": { "label": "指标口径覆盖（第3~9节，40项）", "weight": 30, "score": 30.0 },
     "E": { "label": "口径纪律与反游戏化（第13节）", "weight": 15, "score": 15 }
   },
   "sectionSubtotals": {
-    "§3": 3.7,
-    "§4": 11.4,
-    "§5": 5.2,
-    "§6": 4.3,
-    "§7": 4.4,
-    "§8": 3.2,
+    "§3": 4.0,
+    "§4": 12.0,
+    "§5": 7.0,
+    "§6": 5.0,
+    "§7": 5.0,
+    "§8": 4.0,
     "§9": 3.0
   },
   "indicators": [
     {
+      "id": "§3.session-volume",
       "section": "§3",
       "indicator": "周会话总量",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "sessionVolume() in src/server/telemetry/session-mix.ts；按 updated_at 切周，含跨周唤醒存量；excludedTestSessions 可见",
-      "gap": ""
+      "evidence": ["conversations", "session-mix.ts:sessionVolume", "dashboard:session.volume"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§3.effective-session-rate",
       "section": "§3",
       "indicator": "有效会话占比",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "sessionVolume().effectiveRate；判据取 messages 里 role='user' 且 trim 非空 ≥ 2 轮",
-      "gap": ""
+      "evidence": ["conversations", "messages", "session-mix.ts:sessionVolume#effectiveRate", "dashboard:session.effectiveRate"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§3.role-distribution",
       "section": "§3",
       "indicator": "角色分布",
-      "score": 0.7,
-      "verdict": "proxy",
-      "evidence": "consultantLensMix()（咨询者四画像）+ systemRoleActivity()（专家/知识/运营按活动条数）",
-      "gap": "两个子表分母不同源：咨询者按会话、其余角色按活动条数，横向比较会被误读。要拿满 1.0 需 conversations 表承载四角色会话，属产品动线改造，不做。"
+      "score": 1.0,
+      "verdict": "full",
+      "evidence": ["conversations.role", "role-activity.ts:roleActivityMix", "dashboard:session.lensMix"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§3.cross-week-wakeup",
       "section": "§3",
       "indicator": "跨周唤醒会话占比",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "crossWeekWakeup() + closeConversation() 写 closed_at；wakeupBreaches() 接 P2 告警",
-      "gap": ""
+      "evidence": ["conversations.closed_at", "session-mix.ts:crossWeekWakeup", "dashboard:session.wakeup"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§4.direct-resolution-rate",
       "section": "§4",
       "indicator": "直接解决率",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "formal 会话 / 会话数，分母按 trace_id 去重",
-      "gap": ""
+      "evidence": ["conversations", "review_rounds", "session-mix.ts:sessionVolume", "dashboard:guardrail.directResolutionRate"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§4.hit-rate-at-k",
       "section": "§4",
       "indicator": "Hit Rate@5",
-      "score": 0.7,
-      "verdict": "partial",
-      "evidence": "GoldCase.expectedDocId；runNovaBench 每条独立 search(topK=5)；实测 5/7 = 71.4%",
-      "gap": "探针用 search() 走哈希向量而非生产链路的语义向量（W2 修复）；样本量 7 条、语料 15 篇，小库偏高（W2 扩至 30 条）。"
+      "score": 1.0,
+      "verdict": "full",
+      "evidence": ["eval_runs", "novabench.ts:runNovaBench#expectedDocIds", "dashboard:novabench.hitRate"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§4.citation-binding-rate",
       "section": "§4",
       "indicator": "证据绑定率",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "auditCitations() 纯函数；violatingCards = 0；P0 挂钩",
-      "gap": ""
+      "evidence": ["citation_audits", "guardrail-board.ts:auditBoard#bindingRate", "dashboard:binding.bindingRate"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§4.short-query-fallback-rate",
       "section": "§4",
       "indicator": "短查询回退触发率",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "retrieval_logs 按 (traceId, round) 落库；shortQueryFallbackRate 以轮次为分母；零分母返回 null",
-      "gap": ""
+      "evidence": ["retrieval_logs", "retrieval-log.ts:retrievalStats#shortQueryRate", "dashboard:retrieval.shortQueryRate"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§4.retrieval-p95-latency",
       "section": "§4",
       "indicator": "检索P95耗时",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "retrieval_logs.elapsed_ms P50/P95；retrieval-perf.test.ts 门禁（实测 3.7 ms）",
-      "gap": ""
+      "evidence": ["retrieval_logs.elapsed_ms", "retrieval-log.ts:retrievalStats#elapsed", "dashboard:retrieval.elapsed"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§4.sop-coverage",
       "section": "§4",
       "indicator": "SOP覆盖率",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "documentHealth() LEFT JOIN + json_each(hit_doc_ids)；被命中的 SOP / 全部 SOP",
-      "gap": ""
+      "evidence": ["documents", "retrieval_logs.hit_doc_ids", "retrieval-log.ts:retrievalStats#sopCoverage", "dashboard:retrieval.sopCoverage"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§4.blind-spot-topics",
       "section": "§4",
       "indicator": "知识盲区主题数",
-      "score": 0.7,
-      "verdict": "partial",
-      "evidence": "reviewNode 回填 verified；末轮 verified=0 的查询为盲区；按 scope_hint 分组",
-      "gap": "主题按 scope_hint 分组而非语义聚类，两个不同问题可能落同一格（W5 修复：blindspot-clusters.ts 确定性层次聚类）。"
+      "score": 1.0,
+      "verdict": "full",
+      "evidence": ["retrieval_logs.verified", "retrieval-log.ts:retrievalStats#blindSpots", "scripts/blindspot-clusters.ts", "dashboard:retrieval.blindSpots"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§4.document-health",
       "section": "§4",
       "indicator": "单篇知识健康度",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "documentHealth() 逐篇命中轮次数；LEFT JOIN 保证未命中文档也出现",
-      "gap": ""
+      "evidence": ["documents", "retrieval_logs.hit_doc_ids", "retrieval-log.ts:retrievalStats#documentHealth", "dashboard:knowledge.documents"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§4.novabench-score",
       "section": "§4",
       "indicator": "NovaBench金标得分",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "runNovaBench 9/9；发版门禁",
-      "gap": ""
+      "evidence": ["eval_runs", "novabench.ts:runNovaBench", "dashboard:novabench.score"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§4.refusal-appropriateness",
       "section": "§4",
       "indicator": "拒答恰当率",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "escalationRecall 100%",
-      "gap": ""
+      "evidence": ["eval_runs", "novabench.ts:runNovaBench#escalationRecall", "dashboard:novabench.escalationRecall"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§4.negative-feedback-rate",
       "section": "§4",
       "indicator": "用户负反馈率",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "feedbackMix；score ≤ 2；与采纳率成对",
-      "gap": ""
+      "evidence": ["feedback", "guardrail-board.ts:guardrailBoard#feedback", "dashboard:feedback.negativeRate"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§4.implicit-adoption-rate",
       "section": "§4",
       "indicator": "隐式采纳率",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "adoption_events；copy/export 已接；看板脚注注明采纳率不进可信解决率计算链",
-      "gap": ""
+      "evidence": ["adoption_events", "guardrail-board.ts:guardrailBoard#adoption", "dashboard:adoption.adoptionRate"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§5.defense-layers-pass-rate",
       "section": "§5",
       "indicator": "三层防线各层通过率",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "defense-layers.ts 按 (rule-check, semantic-review, nova-guard) 独立聚合；看板独立一段",
-      "gap": ""
+      "evidence": ["review_rounds", "checkpoints", "defense-layers.ts:defenseLayers", "dashboard:defense.layers"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§5.critic-interception-rate",
       "section": "§5",
       "indicator": "Critic拦截率",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "expert-review / 会话数；与误拦截率成对",
-      "gap": ""
+      "evidence": ["review_rounds", "interception.ts:interceptionStats", "dashboard:guardrail.interceptionRate"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§5.false-interception-rate",
       "section": "§5",
       "indicator": "误拦截率",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "埋点B；intercepted 抽样 0.2",
-      "gap": ""
+      "evidence": ["review_samples", "review-samples.ts:reviewSamples#falseInterception", "dashboard:review.falseInterception"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§5.hallucination-leak-rate",
       "section": "§5",
       "indicator": "漏放率",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "hallucination-set.ts 8 条对抗样例走真实 runConsultationGraph；实测 0/8；scope-contract 第四道防线",
-      "gap": ""
+      "evidence": ["eval_runs", "hallucination-set.ts:HALLUCINATION_CASES", "dashboard:novabench.hallucinationLeaks"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§5.intercept-resolution-rate",
       "section": "§5",
       "indicator": "拦截→解决转化率",
-      "score": 0.2,
-      "verdict": "partial",
-      "evidence": "重试轮次散在 loopTrace 里",
-      "gap": "无 review_rounds 表，无法以会话为分母聚合「被拦截且最终出 formal 卡」比率（W3 修复）。"
+      "score": 1.0,
+      "verdict": "full",
+      "evidence": ["review_rounds", "interception.ts:interceptResolutionRate", "dashboard:interceptResolution.rate"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§5.judge-expert-agreement",
       "section": "§5",
       "indicator": "judge–专家一致率",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "两级判定比对；阈值 85%；跌破进 P1",
-      "gap": ""
+      "evidence": ["review_samples", "review-samples.ts:reviewSamples#judgeAgreement", "dashboard:review.judgeAgreement"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§5.scope-contract-pass-rate",
+      "section": "§5",
+      "indicator": "适用范围契约合规率",
+      "score": 1.0,
+      "verdict": "full",
+      "evidence": ["checkpoints", "defense-layers.ts:scopeContractLayer", "dashboard:defense.layers"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
+    },
+    {
+      "id": "§6.escalation-rate",
       "section": "§6",
       "indicator": "转接率",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "= Critic 拦截率同源",
-      "gap": ""
+      "evidence": ["review_rounds", "interception.ts:interceptionStats", "dashboard:guardrail.interceptionRate"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§6.missed-escalation-rate",
       "section": "§6",
       "indicator": "该转未转率",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "埋点B；not-escalated 抽样率 1（全抽）",
-      "gap": ""
+      "evidence": ["review_samples", "review-samples.ts:reviewSamples#missedEscalation", "dashboard:review.missedEscalation"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§6.expert-sla-rate",
       "section": "§6",
       "indicator": "专家SLA达标率",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "expertSlaBoard() 认领 + 4h 实质响应两条 SLA 分开算；阈值取每个案子自己的 sla；pending 既不进分子也不进分母",
-      "gap": ""
+      "evidence": ["expert_cases.claimed_at", "expert_cases.resolved_at", "lifecycle.ts:expertSlaBoard", "dashboard:lifecycle.expert.claim"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§6.handoff-completeness",
       "section": "§6",
       "indicator": "交接包完整度",
-      "score": 0.3,
-      "verdict": "partial",
-      "evidence": "consultation-journey.ts handoff 有 objective/confirmedFacts/reason/evidence?",
-      "gap": "缺防线记录字段（defenseTrail）；attemptedAction 是写死常量；evidence 可选无校验；100% 硬性目标无校验代码（W3 修复）。"
+      "score": 1.0,
+      "verdict": "full",
+      "evidence": ["checkpoints", "interception.ts:handoffCompleteness", "dashboard:handoffCompleteness.rate"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§6.revision-reflow-rate",
       "section": "§6",
       "indicator": "修订回流率",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "埋点C；缺理由时抛错",
-      "gap": ""
+      "evidence": ["case_closures", "case-closure.ts:closureStats#inflowRate", "dashboard:inflow.inflowRate"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§7.candidate-publish-cycle",
       "section": "§7",
       "indicator": "候选→全量周期",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "knowledgeLifecycle().timeToPublishHours；candidates.published_at（v9 迁移）",
-      "gap": ""
+      "evidence": ["candidates.published_at", "lifecycle.ts:knowledgeLifecycle#timeToPublishHours", "dashboard:lifecycle.knowledge.timeToPublishHours"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§7.gate-pass-rate",
       "section": "§7",
       "indicator": "金标回归通过率",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "ingest_runs.gate 逐次留痕",
-      "gap": ""
+      "evidence": ["ingest_runs.gate", "lifecycle.ts:knowledgeLifecycle#gatePassRate", "dashboard:lifecycle.knowledge.gatePassRate"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§7.rollback-count",
       "section": "§7",
       "indicator": "回滚次数",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "候选回滚（published_at 非空 + gray_started_at 已清）与摄取门禁回滚（ingest_runs）并列；/api/knowledge rollback 分支两列都会动",
-      "gap": ""
+      "evidence": ["candidates", "ingest_runs", "lifecycle.ts:knowledgeLifecycle#rolledBack", "dashboard:lifecycle.knowledge.rolledBack"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§7.gray-incident-rate",
       "section": "§7",
       "indicator": "灰度期问题率",
-      "score": 0.7,
-      "verdict": "proxy",
-      "evidence": "grayWindowIncidents 按最早灰度窗口左端计数；knowledgeLifecycle() in lifecycle.ts",
-      "gap": "quality_events 无 candidate_id，逐候选归因做不了；代理：按最早灰度窗口近似，代码注释已写明。"
+      "score": 1.0,
+      "verdict": "full",
+      "evidence": ["quality_events.candidate_id", "candidates.gray_started_at", "lifecycle.ts:knowledgeLifecycle#grayWindowIncidents", "dashboard:lifecycle.knowledge.grayWindowIncidents"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§7.citation-compliance",
       "section": "§7",
       "indicator": "引用核实合规率",
-      "score": 0.7,
-      "verdict": "partial",
-      "evidence": "citation-provenance.ts 台账；verify-citations.ts；ingest 门禁；实测 1/2 = 50%",
-      "gap": "种子库两条引用不合规：PMID 35361992 话题不匹配，DOI 10.1038/s41598-021-00042-7 CrossRef 404（W1 修复）。"
+      "score": 1.0,
+      "verdict": "full",
+      "evidence": ["data/knowledge/citation-provenance.json", "citation-compliance.ts:citationCompliance", "dashboard:citationCompliance.rate"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§8.first-token-p95",
       "section": "§8",
       "indicator": "P95首token延迟",
-      "score": 0.5,
-      "verdict": "partial",
-      "evidence": "端到端 P95 已落地（50 ms）；latency_samples 记录端到端延迟",
-      "gap": "系统里不存在「首 token」时刻：SSE 是跑完整图后吐已持久化的 checkpoint。需 token 级流式（W4 修复）。"
+      "score": 1.0,
+      "verdict": "full",
+      "evidence": ["latency_samples.first_token_ms", "latency_samples.provider", "latency.ts:latencyStats#firstToken", "dashboard:latency.firstToken"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§8.stream-success-rate",
       "section": "§8",
       "indicator": "流式成功率",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "consultations/route.ts 开流即落 started 行（durationMs=0）；收尾改 completed/failed；ReadableStream.cancel() 改 aborted；latency_samples.outcome 分母已存在",
-      "gap": ""
+      "evidence": ["latency_samples.outcome", "latency.ts:latencyStats#stream", "dashboard:latency.stream"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§8.degrade-matrix-triggers",
       "section": "§8",
       "indicator": "降级矩阵触发次数",
-      "score": 0.7,
-      "verdict": "partial",
-      "evidence": "degrade_triggers 表；recordDegradeTrigger()；deduped 区分控制台注入 vs runtime；degradeMatrixSummary() 五行全出",
-      "gap": "runtime 这半仍为空：NP_DISABLE_FTS/NP_DISABLE_SEMANTIC/provider off 三处触发点零埋点（W3 修复）。"
+      "score": 1.0,
+      "verdict": "full",
+      "evidence": ["degrade_triggers", "degrade-matrix.ts:degradeMatrixSummary", "dashboard:degrade.runtimeTriggers"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§8.test-green-rate",
       "section": "§8",
       "indicator": "测试绿率",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "486 单测 / 38 文件全绿；14 qa 脚本；CI 全绿口径（文档写的 145 已过期）",
-      "gap": ""
+      "evidence": ["eval_runs", "degrade-matrix.ts:degradeMatrixSummary", "dashboard:degrade.testGreenRate"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§9.demo-success-rate",
       "section": "§9",
       "indicator": "demo动线成功率（七步全链路）",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "scripts/demo-e2e.mjs；自清库→启服务→14 个 qa 脚本；支持 --dry-run",
-      "gap": ""
+      "evidence": ["scripts/demo-e2e.mjs", "dashboard:demo.successRate"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§9.fault-injection-rate",
       "section": "§9",
       "indicator": "故障注入演示成功率",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "scripts/inject-fault.ts；offline/model-missing/defense-intercept 三场景；实测 3/3",
-      "gap": ""
+      "evidence": ["scripts/inject-fault.ts", "dashboard:faultInjection.successRate"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     },
     {
+      "id": "§9.cold-start-time",
       "section": "§9",
       "indicator": "免安装包冷启动时间",
       "score": 1.0,
       "verdict": "full",
-      "evidence": "release-packages.yml Cold-start timing 步骤；轮询 HTTP 200；> 30s 打 warning",
-      "gap": ""
+      "evidence": [".github/workflows/release-packages.yml", "dashboard:pkg.coldStartTime"],
+      "probeExpectation": { "hasSource": true, "hasAggregation": true, "onDashboard": true, "isProxy": false },
+      "gap": null,
+      "proxyNote": null
     }
   ]
 }

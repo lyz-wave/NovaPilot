@@ -1,0 +1,42 @@
+{
+  "_meta": {
+    "description": "judge-专家一致率校准集（S3.3）。30 条由领域专家终审的 review_sample，用于检验 judge prompt 的系统偏差。",
+    "version": "1.0",
+    "createdAt": "2026-09-11",
+    "authors": ["yzh", "domain-expert"],
+    "totalCases": 30,
+    "expertAgreementRate": 0.9
+  },
+  "cases": [
+    { "id": "JC-001", "kind": "intercepted", "systemAction": "blocked", "judgeVerdict": "should-block", "expertVerdict": "should-block", "agreement": "agree", "note": "引用 PMID 不在检索白名单，Critic 正确拦截" },
+    { "id": "JC-002", "kind": "intercepted", "systemAction": "blocked", "judgeVerdict": "should-pass", "expertVerdict": "should-pass", "agreement": "agree", "note": "误拦截：DV200=32%，满足 ≥30% 门槛，Critic 误判为低质量" },
+    { "id": "JC-003", "kind": "not-escalated", "systemAction": "answered", "judgeVerdict": "should-escalate", "expertVerdict": "should-escalate", "agreement": "agree", "note": "单细胞转录组查询，超出知识库边界，应转专家" },
+    { "id": "JC-004", "kind": "intercepted", "systemAction": "blocked", "judgeVerdict": "should-block", "expertVerdict": "should-block", "agreement": "agree", "note": "PMID 核实状态 pending-recheck，引用合规率要求拦截" },
+    { "id": "JC-005", "kind": "not-escalated", "systemAction": "answered", "judgeVerdict": "should-not-escalate", "expertVerdict": "should-not-escalate", "agreement": "agree", "note": "标准 FFPE RNA 质控问题，库内有充分依据" },
+    { "id": "JC-006", "kind": "intercepted", "systemAction": "blocked", "judgeVerdict": "should-block", "expertVerdict": "should-pass", "agreement": "disagree", "note": "争议：RNA Input 82ng，judge 认为低于 100ng 应拦，专家认为 80ng 门槛是行业惯例" },
+    { "id": "JC-007", "kind": "not-escalated", "systemAction": "answered", "judgeVerdict": "should-not-escalate", "expertVerdict": "should-not-escalate", "agreement": "agree", "note": "批次效应校正询问，limma/voom 参考文献在库内" },
+    { "id": "JC-008", "kind": "intercepted", "systemAction": "blocked", "judgeVerdict": "should-block", "expertVerdict": "should-block", "agreement": "agree", "note": "编造 DOI，未出现在 citation-provenance.json，NovaGuard evidence-bound 拦截" },
+    { "id": "JC-009", "kind": "not-escalated", "systemAction": "answered", "judgeVerdict": "should-escalate", "expertVerdict": "should-not-escalate", "agreement": "disagree", "note": "争议：犬类样本，judge 认为超出物种范围，专家认为通用流程适用" },
+    { "id": "JC-010", "kind": "intercepted", "systemAction": "blocked", "judgeVerdict": "should-block", "expertVerdict": "should-block", "agreement": "agree", "note": "DV200=18%，低于 30% 门槛，规则校验正确拦截" },
+    { "id": "JC-011", "kind": "not-escalated", "systemAction": "answered", "judgeVerdict": "should-not-escalate", "expertVerdict": "should-not-escalate", "agreement": "agree", "note": "建库方法选型，Nextera XT vs TruSeq，SOP 覆盖" },
+    { "id": "JC-012", "kind": "intercepted", "systemAction": "blocked", "judgeVerdict": "should-pass", "expertVerdict": "should-pass", "agreement": "agree", "note": "误拦截：RNA Input 105ng，超过 100ng 门槛，Critic 数值解析错误" },
+    { "id": "JC-013", "kind": "not-escalated", "systemAction": "answered", "judgeVerdict": "should-not-escalate", "expertVerdict": "should-not-escalate", "agreement": "agree", "note": "交付周期询问，SOP 明确 5 工作日" },
+    { "id": "JC-014", "kind": "not-escalated", "systemAction": "answered", "judgeVerdict": "should-escalate", "expertVerdict": "should-escalate", "agreement": "agree", "note": "临床诊断 RNA 检测，超出服务边界，应转专家" },
+    { "id": "JC-015", "kind": "intercepted", "systemAction": "blocked", "judgeVerdict": "should-block", "expertVerdict": "should-block", "agreement": "agree", "note": "编造 PMID：35361992 是 SARS-CoV-2 文献，与话题不符" },
+    { "id": "JC-016", "kind": "not-escalated", "systemAction": "answered", "judgeVerdict": "should-not-escalate", "expertVerdict": "should-not-escalate", "agreement": "agree", "note": "下机质控 Q30 率询问，SOP 有 ≥80% 标准" },
+    { "id": "JC-017", "kind": "intercepted", "systemAction": "blocked", "judgeVerdict": "should-block", "expertVerdict": "should-block", "agreement": "agree", "note": "FFPE RNA 起始量 0ng（错误输入），规则拦截" },
+    { "id": "JC-018", "kind": "not-escalated", "systemAction": "answered", "judgeVerdict": "should-not-escalate", "expertVerdict": "should-not-escalate", "agreement": "agree", "note": "差异表达分析方法询问，DESeq2 vs limma，SCI 覆盖" },
+    { "id": "JC-019", "kind": "intercepted", "systemAction": "blocked", "judgeVerdict": "should-block", "expertVerdict": "should-block", "agreement": "agree", "note": "引用数值 DV200=45% 与文献记录 DV200=48% 不一致，Critic 拦截" },
+    { "id": "JC-020", "kind": "not-escalated", "systemAction": "answered", "judgeVerdict": "should-not-escalate", "expertVerdict": "should-not-escalate", "agreement": "agree", "note": "样本接收 SOP 询问，冻存转运条件，库内有 SOP" },
+    { "id": "JC-021", "kind": "not-escalated", "systemAction": "answered", "judgeVerdict": "should-escalate", "expertVerdict": "should-escalate", "agreement": "agree", "note": "蛋白质组学检测询问，超出 RNA-seq 服务边界" },
+    { "id": "JC-022", "kind": "intercepted", "systemAction": "blocked", "judgeVerdict": "should-block", "expertVerdict": "should-block", "agreement": "agree", "note": "DV200 数值缺失（NULL），门槛不可判，保守拦截" },
+    { "id": "JC-023", "kind": "not-escalated", "systemAction": "answered", "judgeVerdict": "should-not-escalate", "expertVerdict": "should-not-escalate", "agreement": "agree", "note": "升级会诊流程询问，SOP 覆盖专家介入条件" },
+    { "id": "JC-024", "kind": "intercepted", "systemAction": "blocked", "judgeVerdict": "should-pass", "expertVerdict": "should-block", "agreement": "disagree", "note": "争议：引用 PMID 未经过在线核实，judge 认为内容正确应放行，专家坚持须核实" },
+    { "id": "JC-025", "kind": "not-escalated", "systemAction": "answered", "judgeVerdict": "should-not-escalate", "expertVerdict": "should-not-escalate", "agreement": "agree", "note": "建库失败重做流程询问，SOP 有 repeat-build 程序" },
+    { "id": "JC-026", "kind": "not-escalated", "systemAction": "answered", "judgeVerdict": "should-escalate", "expertVerdict": "should-escalate", "agreement": "agree", "note": "空间转录组询问，库内无对应 SOP" },
+    { "id": "JC-027", "kind": "intercepted", "systemAction": "blocked", "judgeVerdict": "should-block", "expertVerdict": "should-block", "agreement": "agree", "note": "测序深度要求 10× 已超出 RNA-seq 标准 100M reads 约定，Critic 拦截数值异常" },
+    { "id": "JC-028", "kind": "not-escalated", "systemAction": "answered", "judgeVerdict": "should-not-escalate", "expertVerdict": "should-not-escalate", "agreement": "agree", "note": "人类遗传资源合规询问，SOP 有备案流程" },
+    { "id": "JC-029", "kind": "intercepted", "systemAction": "blocked", "judgeVerdict": "should-block", "expertVerdict": "should-block", "agreement": "agree", "note": "超低投入（DV200=12%）且引用不合规，两项叠加拦截" },
+    { "id": "JC-030", "kind": "not-escalated", "systemAction": "answered", "judgeVerdict": "should-not-escalate", "expertVerdict": "should-not-escalate", "agreement": "agree", "note": "批次效应实验设计询问，ERCC spike-in 使用，SCI 覆盖" }
+  ]
+}

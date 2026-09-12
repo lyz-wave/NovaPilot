@@ -499,9 +499,59 @@ CREATE TABLE IF NOT EXISTS retrieval_logs (
 );
 CREATE INDEX IF NOT EXISTS idx_retrieval_logs_created ON retrieval_logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_retrieval_logs_trace ON retrieval_logs(trace_id, round);
+
+-- ── S3.4 漂移哨兵快照表 ──────────────────────────────────────────────────────
+-- 每次 drift-sentinel 跑一遍，按 (metric_id, window_start) 存一行快照。
+-- 分子/分母单独存：哨兵用这两列而不是直接比 rate，防止率相同但体量翻倍时漏报。
+CREATE TABLE IF NOT EXISTS metric_snapshots (
+  id              TEXT PRIMARY KEY,   -- snap-<metricId>-<windowStart>
+  metric_id       TEXT NOT NULL,
+  window_start    TEXT NOT NULL,
+  window_end      TEXT NOT NULL,
+  numerator       REAL NOT NULL,
+  denominator     REAL NOT NULL,
+  rate            REAL,               -- NULL 表示分母为 0
+  alert_fired     INTEGER NOT NULL DEFAULT 0,  -- 1 = 触发了告警
+  alert_rule      TEXT,               -- 触发的规则名，NULL = 无告警
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_metric_snapshots_metric ON metric_snapshots(metric_id, window_start);
+
+-- ── S4-2 Prompt 版本化 ────────────────────────────────────────────────────────
+-- 每个 prompt 用 id（字母数字-横线）+ version（semver 或日期串）标识。
+-- content 是 Handlebars-like 模板（{{var}} 占位符）。
+-- active=1 的版本是当前在用版本，同一 id 只允许一个 active=1。
+CREATE TABLE IF NOT EXISTS prompt_templates (
+  id          TEXT NOT NULL,
+  version     TEXT NOT NULL,
+  content     TEXT NOT NULL,
+  hash        TEXT NOT NULL,   -- SHA-256 of content（前 8 位写进 checkpoints）
+  active      INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT NOT NULL,
+  PRIMARY KEY (id, version)
+);
+CREATE INDEX IF NOT EXISTS idx_prompt_templates_active ON prompt_templates(id, active);
+
+-- ── S4-2 模型调用成本核算 ─────────────────────────────────────────────────────
+-- 每次 complete() / streamText() 落一行，用于计算「单次可信解决成本」。
+-- cost_usd = input_tokens * price_in + output_tokens * price_out（来自 pricing.json）。
+CREATE TABLE IF NOT EXISTS model_calls (
+  id              TEXT PRIMARY KEY,   -- mc-<traceId>-<timestamp>
+  trace_id        TEXT,
+  provider        TEXT NOT NULL,
+  model           TEXT NOT NULL,
+  input_tokens    INTEGER NOT NULL DEFAULT 0,
+  output_tokens   INTEGER NOT NULL DEFAULT 0,
+  cost_usd        REAL,
+  latency_ms      INTEGER,
+  degraded        INTEGER NOT NULL DEFAULT 0,   -- 1 = 走了离线降级路径
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_model_calls_trace ON model_calls(trace_id);
+CREATE INDEX IF NOT EXISTS idx_model_calls_created ON model_calls(created_at);
 `;
 
-export const SCHEMA_VERSION = "11";
+export const SCHEMA_VERSION = "13";
 
 /**
  * 存量库回填:FTS 表是 schema v2 新增的,老库里 chunks 已有数据但
@@ -589,5 +639,23 @@ export const ADDITIVE_COLUMNS: ReadonlyArray<{
     table: "latency_samples",
     column: "provider",
     ddl: "ALTER TABLE latency_samples ADD COLUMN provider TEXT",
+  },
+  // v12 · §7 灰度期问题率归因（S1 迁移）。
+  // quality_events 原本无法逐候选归因：质量事件发生时不知道灰度期哪个候选知识在跑。
+  // 补 candidate_id 后，事件写入端按最早 gray_started_at 倒推出当时的候选，
+  // 两表 JOIN 即可算出「该候选灰度期内的质量事件数 / 总质量事件数」真口径。
+  // NULL = 归因前的存量事件或无法关联，不影响新事件的精确归因。
+  {
+    table: "quality_events",
+    column: "candidate_id",
+    ddl: "ALTER TABLE quality_events ADD COLUMN candidate_id TEXT",
+  },
+  // v13 · S3.3 judge 版本化。同一份 review_sample 在 prompt 升级前后跑出的
+  // judge_verdict 不能混算一致率 —— 加 hash 后可按 prompt 版本分层比较，
+  // 防止「改 prompt 让一致率掉了但均摊进历史数据里」的静默污染。
+  {
+    table: "review_samples",
+    column: "judge_prompt_hash",
+    ddl: "ALTER TABLE review_samples ADD COLUMN judge_prompt_hash TEXT",
   },
 ];

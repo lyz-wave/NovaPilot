@@ -17,7 +17,12 @@
     "review:judge": "vite-node -c vitest.config.ts scripts/judge-review-samples.ts",
     "demo:e2e": "node scripts/demo-e2e.mjs",
     "inject:fault": "vite-node -c vitest.config.ts scripts/inject-fault.ts",
-    "blindspot:clusters": "vite-node -c vitest.config.ts scripts/blindspot-clusters.ts"
+    "blindspot:clusters": "vite-node -c vitest.config.ts scripts/blindspot-clusters.ts",
+    "score:render": "vite-node -c vitest.config.ts scripts/render-scorecard.ts",
+    "score:check": "vite-node -c vitest.config.ts scripts/render-scorecard.ts --check",
+    "bench:gate": "vite-node -c vitest.config.ts scripts/bench-gate.ts",
+    "otel:export": "vite-node -c vitest.config.ts scripts/export-otel.ts",
+    "evidence:bundle": "vite-node -c vitest.config.ts scripts/evidence-bundle.ts"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
