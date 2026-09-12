@@ -94,6 +94,38 @@ export function ExpertWorkbench({ initialCases }: ExpertWorkbenchProps) {
   // 切换案例必须清空编辑态:修订文本、待决策项勾选(按数组下标存)与证据排除都是
   // “这一个案例”的编辑结果。不清空时,在 A 案勾了第 1、2 项再切到 B 案批准,
   // 提交的会是 A 案的修订文本 + B 案里同下标的待决策项,专家从未审过。
+  // 飞书群点击交互卡片「认领此案例」跳转链接处理：自动聚焦并认领目标案例
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const targetClaim = params.get("claim");
+    if (!targetClaim) return;
+    const matched = cases.find((c) => c.expertCase.id === targetClaim);
+    if (matched) {
+      setActiveId(matched.expertCase.id);
+      if (matched.expertCase.status === "awaiting-claim") {
+        void (async () => {
+          setBusy("claim");
+          try {
+            const res = await fetch("/api/expert-cases", {
+              method: "POST",
+              headers: WRITE_HEADERS(),
+              body: JSON.stringify({ action: "claim", caseId: matched.expertCase.id }),
+            });
+            if (res.ok) {
+              const data = (await res.json()) as { case: ExpertCaseRecord | null };
+              replaceCase(data.case);
+              setNotice("已从飞书协同自动认领本案例，SLA 倒计时已正式启动。");
+            }
+          } catch {
+          } finally {
+            setBusy(null);
+          }
+        })();
+      }
+    }
+  }, [cases]);
+
   useEffect(() => {
     setAmendment(DEFAULT_AMENDMENT);
     setResolvedDecisions(new Set());

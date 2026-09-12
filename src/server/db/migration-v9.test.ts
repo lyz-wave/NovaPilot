@@ -125,6 +125,22 @@ describe("v9 增补迁移", () => {
     ).not.toThrow();
   });
 
+  it("PRAGMA busy_timeout 正确配置为 5000ms", () => {
+    const res = db.prepare("PRAGMA busy_timeout").get() as { timeout: number };
+    expect(res.timeout).toBe(5000);
+  });
+
+  it("SCHEMA_SQL 结构性防回归: 所有可增补列均支持 DROP COLUMN 往返解析", () => {
+    // 专门防御在列定义之间书写多行注释破坏 SQLite 逆向语法解析器的回归隐患
+    const testDb = createDb(":memory:");
+    for (const [table, column] of V9_COLUMNS) {
+      expect(() => {
+        testDb.exec(`ALTER TABLE ${table} DROP COLUMN ${column}`);
+      }, `${table}.${column} drop column`).not.toThrow();
+    }
+    expect(() => migrate(testDb)).not.toThrow();
+  });
+
   it("migrate 幂等:重复跑不报 duplicate column", () => {
     expect(() => {
       migrate(db);

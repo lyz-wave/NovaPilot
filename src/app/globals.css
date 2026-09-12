@@ -1218,32 +1218,34 @@
     box-shadow: -16px 0 48px rgba(18, 38, 58, .06);
     display: flex;
     flex-direction: column;
-    min-height: 0; /* grid 项允许收缩(替代 overflow:hidden,避免裁掉收起把手) */
+    min-height: 0;
     min-width: 0;
     padding: 26px 26px 0;
     position: relative;
   }
+  .decision-topline-tools {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+  }
   .panel-collapse-btn {
     align-items: center;
-    background: var(--surface);
-    border: 1px solid var(--line-dark);
-    border-left: 0;
-    border-radius: 0 var(--r-md) var(--r-md) 0;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
     color: var(--ink-soft);
-    display: flex;
-    height: 46px;
+    cursor: pointer;
+    display: inline-flex;
+    height: 28px;
     justify-content: center;
-    left: -17px;
     padding: 0;
-    position: absolute;
-    top: 16px;
-    transition-property: color, background-color;
+    transition-property: background-color, border-color, color, transform;
     transition-duration: var(--fast);
     transition-timing-function: ease-out;
-    width: 17px;
-    z-index: 7;
+    width: 28px;
   }
-  .panel-collapse-btn:hover { background: var(--ink); color: var(--acid); }
+  .panel-collapse-btn:hover { background: var(--ink); border-color: var(--ink); color: var(--acid); }
+  .panel-collapse-btn:active { transform: scale(.94); }
   /* 收起态细条 */
   .decision-panel.panel-collapsed {
     align-items: center;

@@ -50,6 +50,7 @@ import {
 } from "./grounding-loop";
 import { embedSemantic } from "../rag/semantic";
 import { syncDecisionCard } from "../feishu/bitable";
+import { sendSlaAlertCard } from "../feishu/sla-alert";
 import {
   searchSimilarCases,
   recordCaseMemory,
@@ -415,8 +416,8 @@ export async function runConsultationGraph(
         : null,
   };
   saveDecisionCard(db, input.projectId, card, input.traceId, input.now);
-  // 飞书多维表格双写(凭证缺失时 no-op,不阻塞主流程)。
-  void syncDecisionCard(card).catch(() => {});
+  // 飞书多维表格双写(凭证缺失时进入 mock 记录,不阻塞主流程)。
+  void syncDecisionCard(card, input.projectId, input.facts).catch(() => {});
 
   let expertCase: GraphResult["expertCase"] = null;
   if (mustEscalate) {
@@ -469,6 +470,8 @@ export async function runConsultationGraph(
       },
     };
     saveExpertCase(db, input.projectId, expertCase, input.now);
+    // 飞书 SLA 紧急呼叫(Webhook Push, 凭证缺失时进入 mock 记录，保持离线确定性)。
+    void sendSlaAlertCard(expertCase, card).catch(() => {});
     visit("escalate", { caseId: expertCase.id });
   } else {
     visit("finalize", { status });

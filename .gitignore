@@ -1,0 +1,24 @@
+# Dependencies
+node_modules
+/.pnp
+.pnp.js
+
+# Testing & build
+/.next/
+/out/
+build
+dist
+*.tsbuildinfo
+next-env.d.ts
+
+# Local data & models
+/.data/
+models/
+
+# Environment files
+.env*.local
+
+# Logs & OS
+*.log
+.DS_Store
+*.pem

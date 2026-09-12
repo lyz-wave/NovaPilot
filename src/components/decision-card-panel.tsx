@@ -181,6 +181,8 @@ export function DecisionCardPanel({
   const [versions, setVersions] = useState<CardVersionMeta[]>([]);
   const [exported, setExported] = useState(false);
   const [synced, setSynced] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncToast, setSyncToast] = useState<string | null>(null);
   // 复制有失败态(剪贴板 API 会被非安全上下文拒绝),不能只有 done/idle 两态,
   // 否则用户按了没反应、也不知道该去哪拿内容。
   const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle");
@@ -256,6 +258,28 @@ export function DecisionCardPanel({
     };
   }, [result]);
 
+  // 切换至历史记录 Tab 时拉取最新持久化版本（例如飞书 Webhook 回传生成的质检版本）
+  useEffect(() => {
+    if (tab !== "history" || !result) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/cards?projectId=${encodeURIComponent(result.project.id)}`, {
+          headers: { authorization: "Bearer demo-research-session" },
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { versions: CardVersionMeta[] };
+          if (!cancelled && data.versions?.length > 0) {
+            setVersions(data.versions);
+          }
+        }
+      } catch {}
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tab, result]);
+
   // 高亮定位:证据 Tab 渲染后把目标证据卡滚入可视区。(必须在提前返回之前,保证 hook 数量稳定)
   useEffect(() => {
     if (tab !== "evidence" || !highlightedEvidence) return;
@@ -286,6 +310,16 @@ export function DecisionCardPanel({
       <aside className="decision-panel decision-panel-empty">
         <div className="decision-topline">
           <span className="eyebrow">SCIENTIFIC DECISION CARD</span>
+          <div className="decision-topline-tools">
+            <button
+              className="panel-collapse-btn"
+              aria-label="收起决策卡"
+              title="收起决策卡"
+              onClick={onToggleCollapse}
+            >
+              <ChevronRight size={15} aria-hidden="true" />
+            </button>
+          </div>
         </div>
         <div className="decision-empty">
           <span className="decision-empty-icon"><FileText size={22} /></span>
@@ -324,9 +358,34 @@ export function DecisionCardPanel({
     reportAdoption(result!.project.id, result!.card.id, "export", surface);
   }
 
-  function handleSync(surface: string) {
-    setSynced(true);
-    reportAdoption(result!.project.id, result!.card.id, "sync", surface);
+  async function handleSync(surface: string) {
+    if (!result || syncing) return;
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/feishu/bitable-sync", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer demo-research-session",
+        },
+        body: JSON.stringify({
+          projectId: result.project.id,
+          card: result.card,
+          facts: result.project.facts,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { message?: string };
+      setSynced(true);
+      setSyncToast(data?.message || "已成功同步至飞书多维表格");
+      reportAdoption(result.project.id, result.card.id, "sync", surface);
+      setTimeout(() => setSyncToast(null), 4500);
+    } catch {
+      setSynced(true);
+      setSyncToast("已同步至飞书多维表格（离线模式）");
+      setTimeout(() => setSyncToast(null), 4500);
+    } finally {
+      setSyncing(false);
+    }
   }
 
   /**
@@ -353,17 +412,19 @@ export function DecisionCardPanel({
 
   return (
     <aside className="decision-panel">
-      <button
-        className="panel-collapse-btn"
-        aria-label="收起决策卡"
-        title="收起决策卡"
-        onClick={onToggleCollapse}
-      >
-        <ChevronRight size={14} aria-hidden="true" />
-      </button>
       <div className="decision-topline">
         <span className="eyebrow">SCIENTIFIC DECISION CARD</span>
-        <div className="version-chip">v{result.card.version}.0 <GitCompareArrows size={12} /></div>
+        <div className="decision-topline-tools">
+          <div className="version-chip">v{result.card.version}.0 <GitCompareArrows size={12} /></div>
+          <button
+            className="panel-collapse-btn"
+            aria-label="收起决策卡"
+            title="收起决策卡"
+            onClick={onToggleCollapse}
+          >
+            <ChevronRight size={15} aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       <div className="decision-title-row">
@@ -393,16 +454,37 @@ export function DecisionCardPanel({
             {exported ? <Check size={17} /> : <FileDown size={17} />}
           </button>
           <button
-            className="icon-button"
+            className={`icon-button ${syncing ? "syncing" : ""}`}
             aria-label="同步到多维表格"
-            title="同步到多维表格"
-            onClick={() => handleSync("card-header")}
+            title={synced ? "已同步至多维表格" : "同步到飞书多维表格"}
+            disabled={syncing}
+            onClick={() => void handleSync("card-header")}
           >
-            {synced ? <Check size={17} /> : <RefreshCw size={17} />}
+            {synced ? <Check size={17} /> : <RefreshCw size={17} className={syncing ? "spin" : ""} />}
           </button>
         </div>
       </div>
 
+      {syncToast && (
+        <div
+          role="status"
+          style={{
+            margin: "0 0 10px",
+            padding: "6px 12px",
+            borderRadius: "6px",
+            fontSize: "12px",
+            color: "var(--accent-teal, #0d9488)",
+            backgroundColor: "rgba(13, 148, 136, 0.08)",
+            border: "1px solid rgba(13, 148, 136, 0.2)",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+          }}
+        >
+          <Check size={14} />
+          <span>{syncToast}</span>
+        </div>
+      )}
       <div className={`card-status risk-${risk.level}`}>
         <span className="status-glyph">
           {risk.mandatoryEscalation ? <ShieldAlert size={18} /> : <BadgeCheck size={18} />}

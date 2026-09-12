@@ -14,6 +14,7 @@
 export const SCHEMA_SQL = `
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
+PRAGMA busy_timeout = 5000;
 
 CREATE TABLE IF NOT EXISTS schema_meta (
   key   TEXT PRIMARY KEY,
@@ -191,6 +192,8 @@ CREATE TABLE IF NOT EXISTS degrade_triggers (
 CREATE INDEX IF NOT EXISTS idx_degrade_triggers_gate ON degrade_triggers(gate_key, created_at);
 
 -- ── Candidate knowledge (governed evolution) ───────────────────
+-- published_at: 候选→全量周期(第 7 节)。auditTrail 无时间戳，记录发布时刻，回滚不清空。
+-- gray_started_at: 灰度期问题率(第 7 节)的窗口左端。质量事件关联灰度期窗口。
 CREATE TABLE IF NOT EXISTS candidates (
   id                  TEXT PRIMARY KEY,
   source_case_id      TEXT NOT NULL,
@@ -206,26 +209,18 @@ CREATE TABLE IF NOT EXISTS candidates (
   audit_trail         TEXT NOT NULL,   -- JSON
   rollback_version    TEXT,
   created_at          TEXT NOT NULL,
-  -- 候选→全量周期(第 7 节)。auditTrail 的条目是 {stage, actor},**没有时间戳**,
-  -- 所以「什么时候发布的」全库无记录,离线脚本也补不出来 —— 是结构性缺失,不是缺聚合。
-  -- NULL = 尚未发布;发布后回滚**不清空**它:那次发布真实发生过,清掉等于篡改历史。
   published_at        TEXT,
-  -- 灰度期问题率(第 7 节)的窗口左端。质量事件要能关联到「哪一次灰度期内」,
-  -- 只有一个发布时刻是不够的:回滚之后再次灰度,是两个窗口。
   gray_started_at     TEXT
 );
 
 -- ── Expert cases ───────────────────────────────────────────────
+-- claimed_at / resolved_at: 专家认领与解决时刻(第 6 节)，用于按窗口统计「4h 实质响应达标率」。
 CREATE TABLE IF NOT EXISTS expert_cases (
   id           TEXT PRIMARY KEY,
   project_id   TEXT NOT NULL,
   status       TEXT NOT NULL,
   payload      TEXT NOT NULL,          -- full ExpertCase JSON
   created_at   TEXT NOT NULL,
-  -- 专家 SLA 达标率(第 6 节)。payload JSON 里有 claimedAt,但 SLA 是要按窗口
-  -- 聚合的比率,从 JSON 里捞需要全表扫 + 解析;更要命的是 resolvedAt 此前
-  -- **根本没有** —— updateExpertCase 收 resolution 文本却不记时刻,于是
-  -- 「4h 实质响应达标率」结构性不可算。两个时刻都提到列上,SQL 直接能算。
   claimed_at   TEXT,
   resolved_at  TEXT
 );
@@ -269,22 +264,15 @@ CREATE TABLE IF NOT EXISTS settings (
 -- A conversation is just an id + a human title + timestamps; its turns live in
 -- the messages table keyed by the same id. messages.conversation_id stays a
 -- plain column (no FK) so historical single-conversation rows remain valid.
+-- role: 咨询者视角画像(pi | postdoc | student | rnd)，用于看板第 3 节分布统计。
+-- closed_at: 会话闭环时刻(第 3 节跨周唤醒占比 + 第 11 节 P2)。最后一轮产出 formal 卡记时刻，再提问清回 NULL。
 CREATE TABLE IF NOT EXISTS conversations (
   id          TEXT PRIMARY KEY,
   tenant_id   TEXT NOT NULL,
   title       TEXT NOT NULL,
   created_at  TEXT NOT NULL,
   updated_at  TEXT NOT NULL,
-  -- 角色分布(第 3 节)。存的是**咨询者视角**(pi | postdoc | student | rnd) ——
-  -- 用户在角色条上自己选的那个,此前只活在前端 useState 里,从未落库。
-  -- 注意口径:指标体系第 3 节的「四角色」指的是咨询者/专家/知识管理员/运营
-  -- 这四类**系统角色**,那一份由 roleActivity() 从各自的表里算(见 session-mix.ts);
-  -- 这一列是咨询者内部的画像分布,两者不是同一个数,看板上分两格显示。
   role        TEXT,
-  -- 会话闭环时刻(第 3 节跨周唤醒占比 + 第 11 节 P2)。
-  -- 定义:最后一轮产出了 formal 卡 = 这次咨询被答完了。下一轮再来提问时清回 NULL
-  -- (会话被重新打开)。所以它表达的是「当前是否处于已闭环状态」,而不是一个
-  -- 只增不减的墓碑 —— 后者会让「跨周唤醒」这个指标永远算不出重新打开的会话。
   closed_at   TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_conversations_tenant ON conversations(tenant_id, updated_at);
@@ -472,12 +460,7 @@ CREATE TABLE IF NOT EXISTS latency_samples (
   kind         TEXT NOT NULL,            -- research | chat
   card_status  TEXT NOT NULL DEFAULT '', -- formal | expert-review | needs-conditions | ''
   duration_ms  INTEGER NOT NULL,
-  -- 流式成功率(第 8 节)。此前这一项结构性不可算:采样写在 respond() **之后**,
-  -- 中断的流一行都不落,分子分母都拿不到 —— 于是「成功率」只能由成功的样本算出来,
-  -- 恒等于 100%。改成**开流即落一行** started,收尾改 completed / failed,
-  -- 消费端断开由 ReadableStream 的 cancel() 改 aborted。
-  -- 非流式路由固定写 completed;它没有「中断」这个状态,不该混进流式分母。
-  outcome      TEXT NOT NULL DEFAULT 'completed', -- started | completed | aborted | failed
+  outcome      TEXT NOT NULL DEFAULT 'completed', -- started | completed | aborted | failed (服务流式成功率)
   created_at   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_latency_samples_created ON latency_samples(created_at);
@@ -511,9 +494,7 @@ CREATE TABLE IF NOT EXISTS retrieval_logs (
   hit_count           INTEGER NOT NULL,
   hit_doc_ids         TEXT NOT NULL DEFAULT '[]',  -- JSON string[](去重后的文档 id)
   elapsed_ms          INTEGER NOT NULL,
-  -- 回填字段:检索发生在起草之前,本轮证据是否撑住核验要等 review 节点才知道。
-  -- NULL 表示还没回填(流程中断/异常),不能当 0 用 —— 会把中断算成盲区。
-  verified            INTEGER,
+  verified            INTEGER,                           -- review 节点回填是否撑住核验(服务盲区统计)
   created_at          TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_retrieval_logs_created ON retrieval_logs(created_at);
