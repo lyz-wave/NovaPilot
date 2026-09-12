@@ -3,237 +3,194 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NovaPilot · AI先锋大赛 12强决赛展厅</title>
+  <title>NovaPilot · AI未来人才大赛 全国总决赛项目展厅 (安全与可靠性专版)</title>
   <style>
     :root {
-      --bg-dark: #03060b;
-      --bg-surface: #080d17;
-      --bg-card: rgba(13, 20, 36, 0.55);
-      --bg-card-active: rgba(20, 30, 54, 0.75);
-      --border-subtle: rgba(255, 255, 255, 0.08);
-      --border-glow: rgba(0, 240, 255, 0.35);
-      --cyan-core: #00f0ff;
-      --cyan-glow: rgba(0, 240, 255, 0.45);
-      --purple-core: #8a2be2;
-      --purple-glow: rgba(138, 43, 226, 0.45);
-      --emerald-core: #00f5a0;
-      --emerald-glow: rgba(0, 245, 160, 0.4);
-      --rose-core: #ff007f;
-      --amber-core: #ffb703;
-      --text-1: #ffffff;
-      --text-2: #94a3b8;
-      --text-3: #64748b;
-      --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Helvetica Neue", sans-serif;
-      --font-mono: "SF Mono", ui-monospace, Monaco, "Cascadia Code", monospace;
+      --bg-base: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-card: #ffffff;
+      --border-light: #e2e8f0;
+      --border-subtle: #cbd5e1;
+      --border-active: #0284c7;
+      
+      --text-heading: #0f172a;
+      --text-body: #334155;
+      --text-muted: #64748b;
+      --text-light: #94a3b8;
+      
+      --brand-blue: #0284c7;
+      --brand-blue-hover: #0369a1;
+      --brand-teal: #0d9488;
+      --brand-indigo: #4f46e5;
+      --safety-green: #10b981;
+      --safety-green-bg: #ecfdf5;
+      --safety-green-border: #a7f3d0;
+      --safety-red: #ef4444;
+      --safety-red-bg: #fef2f2;
+      --safety-red-border: #fecaca;
+      --safety-amber: #f59e0b;
+      --safety-amber-bg: #fffbeb;
+      --safety-amber-border: #fde68a;
+
+      --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
-    
-    body {
-      font-family: var(--font-display);
-      background-color: var(--bg-dark);
-      color: var(--text-1);
-      overflow-x: hidden;
-      line-height: 1.5;
-      background-image: 
-        radial-gradient(circle at 50% 0%, rgba(0, 240, 255, 0.08) 0%, transparent 50%),
-        radial-gradient(circle at 10% 25%, rgba(138, 43, 226, 0.07) 0%, transparent 40%),
-        radial-gradient(circle at 90% 40%, rgba(0, 245, 160, 0.06) 0%, transparent 45%),
-        linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-      background-size: 100% 100%, 100% 100%, 100% 100%, 48px 48px, 48px 48px;
-    }
 
-    /* 光晕与磨砂效果 */
-    .glass-panel {
-      background: var(--bg-card);
-      backdrop-filter: blur(28px);
-      -webkit-backdrop-filter: blur(28px);
-      border: 1px solid var(--border-subtle);
-      border-radius: 20px;
-      position: relative;
+    body {
+      font-family: var(--font-main);
+      background-color: var(--bg-base);
+      color: var(--text-body);
+      line-height: 1.6;
+      background-image: 
+        radial-gradient(circle at 10% 10%, rgba(2, 132, 199, 0.04) 0%, transparent 40%),
+        radial-gradient(circle at 90% 20%, rgba(13, 148, 136, 0.04) 0%, transparent 40%),
+        radial-gradient(rgba(15, 23, 42, 0.04) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 28px 28px;
     }
 
     /* 顶部导航 */
-    header.top-nav {
+    header.nav-header {
       position: sticky;
       top: 0;
       z-index: 999;
-      backdrop-filter: blur(24px);
-      -webkit-backdrop-filter: blur(24px);
-      background: rgba(3, 6, 11, 0.72);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border-light);
       padding: 0 40px;
       height: 68px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
     }
-    .brand-section {
+    .nav-brand {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 14px;
     }
-    .brand-symbol {
+    .brand-icon-box {
       width: 36px;
       height: 36px;
-      border-radius: 10px;
-      background: linear-gradient(135deg, #00f0ff 0%, #7928ca 100%);
+      border-radius: 9px;
+      background: linear-gradient(135deg, #0284c7 0%, #0d9488 100%);
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 0 24px rgba(0, 240, 255, 0.4);
-      position: relative;
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
     }
-    .brand-symbol::after {
-      content: "";
-      position: absolute;
-      inset: -2px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, rgba(0,240,255,0.6), transparent);
-      z-index: -1;
-      filter: blur(4px);
-    }
-    .brand-symbol svg { width: 20px; height: 20px; fill: #fff; }
-    .brand-text {
+    .brand-icon-box svg { width: 20px; height: 20px; fill: currentColor; }
+    .brand-name {
       font-size: 20px;
       font-weight: 700;
-      letter-spacing: -0.6px;
-      background: linear-gradient(180deg, #ffffff 40%, #94a3b8 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
+      color: var(--text-heading);
     }
-    .pioneer-chip {
+    .talent-badge {
       font-size: 11px;
       font-weight: 600;
-      letter-spacing: 0.8px;
       padding: 3px 10px;
       border-radius: 20px;
-      background: rgba(0, 240, 255, 0.08);
-      border: 1px solid rgba(0, 240, 255, 0.3);
-      color: var(--cyan-core);
-      display: flex;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1d4ed8;
+      display: inline-flex;
       align-items: center;
-      gap: 6px;
-      text-transform: uppercase;
-      box-shadow: 0 0 12px rgba(0, 240, 255, 0.15);
+      gap: 5px;
     }
-    .pioneer-chip::before {
+    .talent-badge::before {
       content: "";
       width: 6px;
       height: 6px;
       border-radius: 50%;
-      background: var(--cyan-core);
-      box-shadow: 0 0 8px var(--cyan-core);
+      background: #2563eb;
     }
 
-    nav.nav-links {
+    nav.nav-menu {
       display: flex;
-      gap: 32px;
+      gap: 28px;
     }
-    nav.nav-links a {
-      color: var(--text-2);
+    nav.nav-menu a {
+      color: var(--text-muted);
       text-decoration: none;
-      font-size: 13.5px;
+      font-size: 14px;
       font-weight: 500;
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-      position: relative;
-      padding: 6px 0;
+      transition: color 0.2s;
     }
-    nav.nav-links a:hover {
-      color: #fff;
-    }
-    nav.nav-links a:hover::after {
-      content: "";
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      height: 2px;
-      background: linear-gradient(90deg, var(--cyan-core), var(--emerald-core));
-      border-radius: 2px;
-      box-shadow: 0 0 8px var(--cyan-core);
-    }
+    nav.nav-menu a:hover { color: var(--brand-blue); }
 
-    .nav-cta-wrap {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .btn-launch {
-      background: linear-gradient(135deg, #00f0ff 0%, #0070f3 100%);
-      color: #020710;
+    .nav-btn {
+      background: var(--brand-blue);
+      color: #fff;
       font-weight: 600;
       font-size: 13px;
-      padding: 9px 20px;
-      border-radius: 10px;
+      padding: 8px 18px;
+      border-radius: 8px;
       text-decoration: none;
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      box-shadow: 0 4px 20px rgba(0, 240, 255, 0.35);
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      gap: 6px;
+      transition: all 0.2s;
+      box-shadow: 0 2px 10px rgba(2, 132, 199, 0.2);
     }
-    .btn-launch:hover {
-      transform: translateY(-1.5px);
-      box-shadow: 0 6px 28px rgba(0, 240, 255, 0.55);
+    .nav-btn:hover {
+      background: var(--brand-blue-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.3);
     }
 
-    /* 主布局 */
-    main.main-body {
-      max-width: 1320px;
+    /* 主体布局 */
+    main.main-content {
+      max-width: 1240px;
       margin: 0 auto;
-      padding: 60px 32px 140px;
+      padding: 56px 24px 120px;
     }
 
-    /* 英雄区 (Hero Section) */
-    section.hero-section {
+    /* 英雄区 (Hero) */
+    section.hero-banner {
       text-align: center;
-      margin-bottom: 84px;
-      position: relative;
+      margin-bottom: 70px;
     }
-    .hero-badge-pill {
+    .safety-pill-tag {
       display: inline-flex;
       align-items: center;
       gap: 8px;
       padding: 6px 16px;
-      border-radius: 40px;
-      background: rgba(138, 43, 226, 0.12);
-      border: 1px solid rgba(138, 43, 226, 0.3);
-      color: #e9d5ff;
+      border-radius: 30px;
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      color: #065f46;
       font-size: 12.5px;
-      font-weight: 500;
-      margin-bottom: 28px;
-      backdrop-filter: blur(12px);
-      box-shadow: 0 0 20px rgba(138, 43, 226, 0.2);
-    }
-    .hero-title {
-      font-size: clamp(42px, 5.5vw, 68px);
-      font-weight: 800;
-      letter-spacing: -0.04em;
-      line-height: 1.12;
+      font-weight: 600;
       margin-bottom: 24px;
-      background: linear-gradient(180deg, #ffffff 20%, #cbd5e1 75%, #64748b 100%);
+    }
+    .hero-h1 {
+      font-size: clamp(38px, 5vw, 60px);
+      font-weight: 800;
+      color: var(--text-heading);
+      letter-spacing: -0.04em;
+      line-height: 1.18;
+      margin-bottom: 20px;
+    }
+    .hero-h1 span.safety-highlight {
+      background: linear-gradient(135deg, #0284c7 0%, #0d9488 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
-    .hero-title span.glow-text {
-      background: linear-gradient(135deg, #00f0ff 0%, #a78bfa 50%, #00f5a0 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      text-shadow: 0 0 40px rgba(0, 240, 255, 0.3);
-    }
-    .hero-subtitle {
-      font-size: clamp(17px, 1.8vw, 20px);
-      color: var(--text-2);
-      max-width: 860px;
-      margin: 0 auto 44px;
+    .hero-desc {
+      font-size: clamp(16px, 1.8vw, 19px);
+      color: var(--text-muted);
+      max-width: 840px;
+      margin: 0 auto 40px;
       font-weight: 400;
       line-height: 1.6;
     }
 
-    /* 顶格关键指标卡 (Hero Bento Metrics) */
-    .hero-metrics-bento {
+    /* 安全关键量化卡片 (Safety Metric Bento) */
+    .safety-metrics-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 18px;
@@ -241,325 +198,280 @@
       margin: 0 auto;
     }
     @media (max-width: 900px) {
-      .hero-metrics-bento { grid-template-columns: repeat(2, 1fr); }
+      .safety-metrics-grid { grid-template-columns: repeat(2, 1fr); }
     }
-    .metric-card {
-      background: rgba(14, 22, 38, 0.5);
-      backdrop-filter: blur(20px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+    .safety-metric-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-light);
       border-radius: 16px;
-      padding: 20px 22px;
+      padding: 22px 20px;
       text-align: left;
-      position: relative;
-      overflow: hidden;
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
     }
-    .metric-card:hover {
-      transform: translateY(-3px);
-      border-color: rgba(0, 240, 255, 0.4);
-      background: rgba(18, 28, 50, 0.7);
-      box-shadow: 0 12px 30px rgba(0, 240, 255, 0.12);
+    .safety-metric-box:hover {
+      transform: translateY(-2px);
+      border-color: var(--border-active);
+      box-shadow: 0 10px 24px rgba(2, 132, 199, 0.08);
     }
-    .metric-card::before {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, var(--accent-color, var(--cyan-core)), transparent);
-    }
-    .metric-val {
-      font-size: 28px;
+    .metric-head {
+      font-size: 11px;
       font-weight: 700;
-      font-family: var(--font-mono);
-      color: #fff;
-      margin-bottom: 6px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
       display: flex;
-      align-items: baseline;
+      align-items: center;
       gap: 6px;
     }
-    .metric-val small {
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--accent-color, var(--cyan-core));
-      font-family: var(--font-display);
-    }
-    .metric-name {
-      font-size: 13px;
-      color: var(--text-2);
-      font-weight: 500;
+    .metric-number {
+      font-size: 30px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      color: var(--text-heading);
+      line-height: 1.1;
       margin-bottom: 4px;
     }
-    .metric-sub {
-      font-size: 11px;
-      color: var(--text-3);
+    .metric-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-body);
+    }
+    .metric-detail {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      margin-top: 4px;
     }
 
     /* ═════════════════════════════════════════════════════
-       顶级沉浸式操作视频大厅 (Cinematic Video Theater)
+       浅色操作视频展厅 (Clinical / Studio Video Theater)
        ═════════════════════════════════════════════════════ */
-    section.video-theater-section {
-      margin-bottom: 120px;
+    section.video-showcase-section {
+      margin-bottom: 110px;
     }
-    .section-headline-group {
-      margin-bottom: 28px;
+    .section-header-block {
+      margin-bottom: 24px;
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
     }
-    .section-eyebrow {
-      font-size: 12px;
+    .section-tagline {
+      font-size: 11.5px;
       font-weight: 700;
-      color: var(--cyan-core);
+      color: var(--brand-blue);
       text-transform: uppercase;
-      letter-spacing: 1.2px;
-      margin-bottom: 8px;
+      letter-spacing: 1px;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
+      margin-bottom: 6px;
     }
-    .section-eyebrow::before {
-      content: "";
-      width: 14px;
-      height: 2px;
-      background: var(--cyan-core);
-      box-shadow: 0 0 6px var(--cyan-core);
-    }
-    .section-title {
-      font-size: 32px;
-      font-weight: 700;
+    .section-title-text {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--text-heading);
       letter-spacing: -0.03em;
-      color: #fff;
     }
-    .section-caption {
+    .section-subtitle-text {
       font-size: 14px;
-      color: var(--text-2);
+      color: var(--text-muted);
       margin-top: 4px;
     }
 
-    /* 巨幅影院主舞台 */
-    .cinema-stage-wrap {
-      position: relative;
-    }
-    /* 屏幕氛围背光 (Ambilight) */
-    .stage-ambilight {
-      position: absolute;
-      inset: 20px;
-      background: radial-gradient(circle at 50% 50%, rgba(0, 240, 255, 0.25) 0%, rgba(138, 43, 226, 0.2) 40%, transparent 70%);
-      filter: blur(80px);
-      z-index: 0;
-      opacity: 0.85;
-      pointer-events: none;
-      transition: background 0.8s ease;
-    }
-
-    .cinema-box {
-      position: relative;
-      z-index: 1;
-      background: #060a12;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 24px;
+    /* 阳极氧化铝与医学白展示台 */
+    .studio-display-frame {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 20px;
       box-shadow: 
-        0 30px 90px -20px rgba(0, 0, 0, 0.9),
-        0 0 0 1px rgba(255, 255, 255, 0.05),
-        0 0 40px rgba(0, 240, 255, 0.15);
+        0 20px 50px -10px rgba(15, 23, 42, 0.08),
+        0 1px 3px rgba(15, 23, 42, 0.05);
       overflow: hidden;
       display: grid;
-      grid-template-columns: 1fr 380px;
+      grid-template-columns: 1fr 360px;
     }
-    @media (max-width: 1080px) {
-      .cinema-box { grid-template-columns: 1fr; }
+    @media (max-width: 1040px) {
+      .studio-display-frame { grid-template-columns: 1fr; }
     }
 
-    /* 播放器左侧画幅 */
-    .cinema-viewport {
+    /* 视窗左侧 */
+    .studio-viewport {
+      background: #f8fafc;
+      border-right: 1px solid var(--border-light);
       display: flex;
       flex-direction: column;
-      background: #02050a;
-      border-right: 1px solid rgba(255, 255, 255, 0.08);
     }
-    .cinema-header-bar {
-      height: 44px;
-      background: rgba(10, 16, 28, 0.85);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    .studio-titlebar {
+      height: 42px;
+      background: #ffffff;
+      border-bottom: 1px solid var(--border-light);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 20px;
+      padding: 0 18px;
     }
-    .traffic-controls {
+    .window-dots-light {
       display: flex;
       gap: 7px;
     }
-    .ctrl-dot {
-      width: 11px;
-      height: 11px;
-      border-radius: 50%;
-    }
-    .ctrl-red { background: #ff5f56; }
-    .ctrl-yellow { background: #ffbd2e; }
-    .ctrl-green { background: #27c93f; }
+    .dot { width: 11px; height: 11px; border-radius: 50%; }
+    .dot-close { background: #fda4af; }
+    .dot-min { background: #fde68a; }
+    .dot-max { background: #a7f3d0; }
 
-    .cinema-live-pill {
+    .studio-scene-pill {
       font-size: 11px;
+      font-weight: 700;
+      color: #0369a1;
       font-family: var(--font-mono);
-      font-weight: 600;
-      color: var(--emerald-core);
+      background: #e0f2fe;
+      padding: 2px 10px;
+      border-radius: 20px;
       display: flex;
       align-items: center;
-      gap: 7px;
-      background: rgba(0, 245, 160, 0.1);
-      border: 1px solid rgba(0, 245, 160, 0.25);
-      padding: 3px 10px;
-      border-radius: 20px;
+      gap: 6px;
     }
-    .live-pulse {
+    .scene-pulse-dot {
       width: 6px;
       height: 6px;
       border-radius: 50%;
-      background: var(--emerald-core);
-      box-shadow: 0 0 10px var(--emerald-core);
-      animation: pulseAnim 1.5s infinite;
-    }
-    @keyframes pulseAnim {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.8); }
+      background: #0284c7;
+      box-shadow: 0 0 6px #0284c7;
     }
 
-    /* 视频视界屏幕 */
-    .screen-canvas-area {
+    /* 播放器与模拟画布区 */
+    .screen-stage {
       position: relative;
       aspect-ratio: 16 / 9.5;
-      background: #040810;
-      overflow: hidden;
+      background: #ffffff;
       display: flex;
       align-items: center;
       justify-content: center;
+      overflow: hidden;
     }
 
-    video#actual-video {
+    video#demo-video {
       width: 100%;
       height: 100%;
       object-fit: contain;
-      background: #000;
+      background: #0f172a;
       display: none;
     }
-    video#actual-video.video-active {
-      display: block;
-    }
+    video#demo-video.active-video { display: block; }
 
-    /* 高保真科研模拟 UI 引擎 (当无本地视频时自动渲染) */
-    .cyber-sim-screen {
+    /* 高保真安全实验室模拟仪表盘 */
+    .safety-sim-layout {
       width: 100%;
       height: 100%;
       position: absolute;
       inset: 0;
-      padding: 24px;
+      padding: 20px;
       display: grid;
       grid-template-columns: 1.15fr 1fr;
-      gap: 18px;
-      background: 
-        radial-gradient(circle at 75% 20%, rgba(0, 240, 255, 0.08) 0%, transparent 60%),
-        radial-gradient(circle at 20% 80%, rgba(138, 43, 226, 0.08) 0%, transparent 60%),
-        #040711;
+      gap: 16px;
+      background: #f8fafc;
     }
     @media (max-width: 768px) {
-      .cyber-sim-screen { grid-template-columns: 1fr; }
+      .safety-sim-layout { grid-template-columns: 1fr; }
     }
 
-    /* 模拟左屏：生信测序监控流水线 */
-    .sim-left-panel {
-      background: rgba(10, 16, 30, 0.7);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 14px;
+    .sim-left-card {
+      background: #ffffff;
+      border: 1px solid var(--border-light);
+      border-radius: 12px;
       padding: 16px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
     }
-    .panel-header-mini {
+    .sim-card-top {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      border-bottom: 1px solid var(--border-light);
       padding-bottom: 8px;
     }
-    .panel-header-mini span {
+    .sim-card-title {
       font-size: 11px;
       font-weight: 700;
-      color: #94a3b8;
+      color: var(--text-muted);
       letter-spacing: 0.5px;
       font-family: var(--font-mono);
     }
-    .wave-canvas-wrap {
-      height: 75px;
-      background: rgba(0, 0, 0, 0.4);
+    .sample-pill {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: #0369a1;
+      background: #e0f2fe;
+      padding: 1px 7px;
+      border-radius: 4px;
+    }
+
+    /* 测序质控色谱动态图 */
+    .canvas-box {
+      height: 70px;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
       border-radius: 8px;
-      position: relative;
       overflow: hidden;
-      border: 1px solid rgba(0, 240, 255, 0.15);
     }
-    canvas#chromatogram-canvas {
-      width: 100%;
-      height: 100%;
-    }
-    .terminal-stream-box {
+    canvas#wave-canvas { width: 100%; height: 100%; }
+
+    /* 审计流式控制台 */
+    .audit-terminal-box {
       flex: 1;
-      background: #02050a;
-      border: 1px solid rgba(255, 255, 255, 0.05);
+      background: #0f172a;
       border-radius: 8px;
       padding: 10px 12px;
       font-family: var(--font-mono);
       font-size: 11px;
-      color: #6ee7b7;
-      overflow-y: auto;
+      color: #38bdf8;
       line-height: 1.6;
+      overflow-y: auto;
     }
-    .term-line { margin-bottom: 3px; }
-    .term-cyan { color: #38bdf8; }
-    .term-dim { color: #64748b; }
-    .term-rose { color: #f43f5e; font-weight: 700; }
+    .term-row { margin-bottom: 3px; }
+    .t-dim { color: #64748b; }
+    .t-green { color: #34d399; }
+    .t-red { color: #f87171; font-weight: 700; }
 
-    /* 模拟右屏：科学决策卡与飞书微卡片交互 */
-    .sim-right-panel {
-      background: rgba(14, 22, 42, 0.85);
-      border: 1px solid rgba(0, 240, 255, 0.25);
-      border-radius: 14px;
+    /* 模拟右屏：决策卡与安全闸门 */
+    .sim-right-card {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
       padding: 16px;
       display: flex;
       flex-direction: column;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
     }
-    .card-topline-mini {
+    .gate-top-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 8px;
     }
-    .card-id-badge {
-      font-size: 10.5px;
-      font-family: var(--font-mono);
-      color: var(--cyan-core);
-      background: rgba(0, 240, 255, 0.1);
-      padding: 2px 7px;
+    .gate-status-tag {
+      font-size: 11px;
+      font-weight: 700;
+      color: #b91c1c;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      padding: 2px 8px;
       border-radius: 4px;
     }
-    .card-version-badge {
-      font-size: 10.5px;
-      font-family: var(--font-mono);
-      color: #cbd5e1;
-    }
-    .sim-card-heading {
+    .card-title-mini {
       font-size: 13.5px;
       font-weight: 700;
-      color: #fff;
+      color: var(--text-heading);
       line-height: 1.4;
       margin-bottom: 10px;
     }
-    .sim-risk-strip {
-      background: rgba(244, 63, 94, 0.12);
-      border: 1px solid rgba(244, 63, 94, 0.3);
+    .safety-alert-banner {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
       border-radius: 8px;
       padding: 8px 12px;
       display: flex;
@@ -567,36 +479,43 @@
       align-items: center;
       margin-bottom: 12px;
     }
-    .sim-risk-text {
+    .banner-text {
       font-size: 11px;
-      color: #fda4af;
+      color: #92400e;
       font-weight: 600;
     }
-    .sim-risk-val {
+    .banner-score {
       font-size: 14px;
       font-weight: 800;
       font-family: var(--font-mono);
-      color: #f43f5e;
+      color: #b45309;
     }
-    .sim-feishu-mini-callout {
+
+    /* 飞书群安全呼叫微视窗 */
+    .feishu-sla-callout-light {
       margin-top: auto;
-      background: rgba(3, 105, 161, 0.18);
-      border: 1px solid rgba(56, 189, 248, 0.4);
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
       border-radius: 10px;
       padding: 10px 12px;
     }
-    .feishu-mini-header {
+    .sla-head-title {
       font-size: 11px;
       font-weight: 700;
-      color: #38bdf8;
+      color: #1d4ed8;
+      margin-bottom: 4px;
       display: flex;
       align-items: center;
       gap: 6px;
-      margin-bottom: 6px;
     }
-    .feishu-mini-btn {
+    .sla-desc-text {
+      font-size: 11px;
+      color: #3b82f6;
+      margin-bottom: 8px;
+    }
+    .sla-claim-btn-light {
       width: 100%;
-      background: #0284c7;
+      background: #2563eb;
       color: #fff;
       border: none;
       padding: 6px 0;
@@ -604,77 +523,61 @@
       font-size: 11px;
       font-weight: 600;
       cursor: pointer;
-      box-shadow: 0 2px 10px rgba(2, 132, 199, 0.4);
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
       transition: all 0.2s;
     }
-    .feishu-mini-btn:hover {
-      background: #0369a1;
-      transform: scale(1.02);
+    .sla-claim-btn-light:hover {
+      background: #1d4ed8;
     }
 
-    /* 播放器控制底栏 */
-    .cinema-control-bar {
-      height: 54px;
-      background: #080d17;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    /* 播放控制条 */
+    .studio-controlbar {
+      height: 52px;
+      background: #ffffff;
+      border-top: 1px solid var(--border-light);
       display: flex;
       align-items: center;
-      padding: 0 20px;
-      gap: 18px;
+      padding: 0 18px;
+      gap: 16px;
     }
-    .play-btn-circle {
-      width: 34px;
-      height: 34px;
+    .btn-play-light {
+      width: 32px;
+      height: 32px;
       border-radius: 50%;
-      background: linear-gradient(135deg, var(--cyan-core), var(--cyan-glow));
-      color: #020710;
+      background: var(--brand-blue);
+      color: #fff;
       border: none;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      box-shadow: 0 0 16px rgba(0, 240, 255, 0.4);
-      transition: all 0.2s;
+      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
+      transition: transform 0.2s;
     }
-    .play-btn-circle:hover {
-      transform: scale(1.08);
-      box-shadow: 0 0 24px rgba(0, 240, 255, 0.65);
-    }
-    .cinema-scrubber {
+    .btn-play-light:hover { transform: scale(1.06); }
+    .studio-progress {
       flex: 1;
-      height: 5px;
-      background: rgba(255, 255, 255, 0.1);
+      height: 6px;
+      background: #e2e8f0;
       border-radius: 4px;
       cursor: pointer;
       position: relative;
     }
-    .scrubber-fill {
+    .progress-bar-fill {
       height: 100%;
-      width: 42%;
-      background: linear-gradient(90deg, var(--cyan-core), var(--emerald-core));
+      width: 36%;
+      background: linear-gradient(90deg, #0284c7, #0d9488);
       border-radius: 4px;
-      position: relative;
     }
-    .scrubber-fill::after {
-      content: "";
-      position: absolute;
-      right: -4px;
-      top: -3.5px;
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: #fff;
-      box-shadow: 0 0 8px var(--cyan-core);
-    }
-    .cinema-time-text {
+    .time-indicator {
       font-size: 11.5px;
       font-family: var(--font-mono);
-      color: var(--text-2);
+      color: var(--text-muted);
     }
-    .rate-btn {
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: #cbd5e1;
+    .btn-tool-light {
+      background: #f1f5f9;
+      border: 1px solid var(--border-light);
+      color: var(--text-body);
       padding: 4px 9px;
       border-radius: 6px;
       font-size: 11px;
@@ -683,798 +586,803 @@
       font-weight: 600;
     }
 
-    /* 播放器右侧场景清单 (Scene Chapters) */
-    .cinema-playlist {
-      background: #070c16;
+    /* 右侧安全场景列表 */
+    .studio-sidebar {
+      background: #ffffff;
+      padding: 20px;
       display: flex;
       flex-direction: column;
-      padding: 22px;
-      gap: 16px;
+      gap: 14px;
     }
-    .playlist-heading {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .playlist-title {
-      font-size: 12px;
+    .sidebar-label {
+      font-size: 11.5px;
       font-weight: 700;
-      color: var(--text-3);
+      color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.8px;
+      letter-spacing: 0.6px;
     }
-    .scene-items-col {
+    .scenes-column {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
       flex: 1;
       overflow-y: auto;
     }
-    .scene-item-card {
-      background: rgba(255, 255, 255, 0.025);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 12px;
-      padding: 14px;
-      cursor: pointer;
-      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    .scene-button-card {
+      background: #f8fafc;
+      border: 1px solid var(--border-light);
+      border-radius: 10px;
+      padding: 12px 14px;
       text-align: left;
+      cursor: pointer;
+      transition: all 0.2s;
     }
-    .scene-item-card:hover {
-      background: rgba(255, 255, 255, 0.06);
-      border-color: rgba(0, 240, 255, 0.3);
-      transform: translateX(2px);
+    .scene-button-card:hover {
+      background: #f1f5f9;
+      border-color: #cbd5e1;
     }
-    .scene-item-card.scene-selected {
-      background: rgba(0, 240, 255, 0.07);
-      border-color: var(--cyan-core);
-      box-shadow: 0 0 20px rgba(0, 240, 255, 0.15);
+    .scene-button-card.active-scene {
+      background: #eff6ff;
+      border-color: #3b82f6;
+      box-shadow: 0 2px 10px rgba(59, 130, 246, 0.12);
     }
-    .scene-meta-row {
+    .scene-card-top {
       display: flex;
       justify-content: space-between;
-      margin-bottom: 6px;
-    }
-    .scene-tag {
-      font-size: 10px;
-      font-weight: 700;
-      padding: 2px 7px;
-      border-radius: 4px;
-      background: rgba(0, 240, 255, 0.12);
-      color: var(--cyan-core);
-      font-family: var(--font-mono);
-    }
-    .scene-duration {
-      font-size: 11px;
-      color: var(--text-3);
-      font-family: var(--font-mono);
-    }
-    .scene-item-name {
-      font-size: 13.5px;
-      font-weight: 600;
-      color: #fff;
       margin-bottom: 4px;
     }
-    .scene-item-desc {
+    .scene-badge-light {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #e0f2fe;
+      color: #0369a1;
+      font-family: var(--font-mono);
+    }
+    .scene-duration-light {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+    .scene-name-light {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-heading);
+      margin-bottom: 3px;
+    }
+    .scene-desc-light {
       font-size: 11.5px;
-      color: var(--text-2);
+      color: var(--text-muted);
       line-height: 1.45;
     }
 
-    /* 录屏本地导入面板 */
-    .video-drop-dock {
-      background: rgba(138, 43, 226, 0.08);
-      border: 1px dashed rgba(138, 43, 226, 0.35);
-      border-radius: 12px;
-      padding: 14px;
+    /* 本地录屏导入框 */
+    .local-video-importer-light {
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      border-radius: 10px;
+      padding: 12px;
       text-align: center;
       transition: border-color 0.2s;
     }
-    .video-drop-dock:hover {
-      border-color: rgba(138, 43, 226, 0.7);
-    }
-    .dock-title {
+    .local-video-importer-light:hover { border-color: var(--brand-blue); }
+    .upload-title-light {
       font-size: 12px;
-      font-weight: 600;
-      color: #d8b4fe;
+      font-weight: 700;
+      color: var(--text-heading);
       margin-bottom: 4px;
     }
-    .dock-tip {
+    .upload-sub-light {
       font-size: 11px;
-      color: var(--text-3);
+      color: var(--text-muted);
       margin-bottom: 10px;
     }
-    .dock-upload-btn {
+    .btn-file-select-light {
       display: block;
       width: 100%;
-      background: rgba(138, 43, 226, 0.25);
-      border: 1px solid rgba(138, 43, 226, 0.5);
-      color: #f3e8ff;
-      border-radius: 8px;
-      padding: 8px 0;
-      font-size: 12px;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      color: var(--text-heading);
+      border-radius: 6px;
+      padding: 7px 0;
+      font-size: 11.5px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      transition: all 0.2s;
     }
-    .dock-upload-btn:hover {
-      background: rgba(138, 43, 226, 0.45);
+    .btn-file-select-light:hover {
+      background: #f1f5f9;
+      border-color: #94a3b8;
     }
-    input#local-video-picker { display: none; }
+    input#local-video-file-input { display: none; }
 
     /* ═════════════════════════════════════════════════════
-       Bento Grid 核心技术全景 (Bento Architecture)
+       围绕安全的架构拆解 (Safety Architecture Blueprint)
        ═════════════════════════════════════════════════════ */
-    section.bento-section {
-      margin-bottom: 120px;
+    section.safety-arch-section {
+      margin-bottom: 110px;
     }
-    .bento-container {
+    .arch-grid-light {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
       gap: 20px;
-      margin-top: 32px;
+      margin-top: 28px;
     }
-    @media (max-width: 960px) {
-      .bento-container { grid-template-columns: 1fr; }
-    }
-    .bento-cell {
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: 20px;
-      padding: 28px;
+    .arch-card-light {
+      background: #ffffff;
+      border: 1px solid var(--border-light);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.03);
       position: relative;
-      overflow: hidden;
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.2s;
     }
-    .bento-cell:hover {
-      transform: translateY(-4px);
-      border-color: rgba(0, 240, 255, 0.35);
-      box-shadow: 0 16px 40px rgba(0, 240, 255, 0.1);
+    .arch-card-light:hover {
+      transform: translateY(-3px);
+      border-color: #94a3b8;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.07);
     }
-    .bento-col-span-2 { grid-column: span 2; }
-    @media (max-width: 960px) {
-      .bento-col-span-2 { grid-column: span 1; }
+    .arch-step-badge {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      font-size: 20px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      color: #e2e8f0;
     }
-    .bento-icon-box {
-      width: 44px;
-      height: 44px;
-      border-radius: 12px;
-      background: rgba(0, 240, 255, 0.1);
-      border: 1px solid rgba(0, 240, 255, 0.25);
+    .arch-icon-box {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: #eff6ff;
+      color: #0284c7;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 20px;
-      margin-bottom: 20px;
-    }
-    .bento-card-title {
       font-size: 19px;
+      margin-bottom: 16px;
+    }
+    .arch-card-title {
+      font-size: 17px;
       font-weight: 700;
-      color: #fff;
-      margin-bottom: 10px;
-      letter-spacing: -0.02em;
+      color: var(--text-heading);
+      margin-bottom: 8px;
     }
-    .bento-card-desc {
-      font-size: 13.5px;
-      color: var(--text-2);
-      line-height: 1.65;
-      margin-bottom: 18px;
+    .arch-card-p {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.6;
     }
-    .bento-tag-pills {
+    .arch-tag-row {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       flex-wrap: wrap;
+      margin-top: 14px;
     }
-    .bento-tag {
+    .arch-tag-pill {
       font-size: 11px;
       font-family: var(--font-mono);
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      padding: 3px 9px;
-      border-radius: 6px;
-      color: #cbd5e1;
+      background: #f1f5f9;
+      color: #475569;
+      padding: 2px 7px;
+      border-radius: 4px;
     }
 
     /* ═════════════════════════════════════════════════════
-       飞书生态双向协同 (Feishu Dual Loop Showcase)
+       飞书生态双向安全协同 (Feishu Safety Loop)
        ═════════════════════════════════════════════════════ */
-    section.feishu-ecosystem-section {
-      margin-bottom: 120px;
-      background: linear-gradient(180deg, rgba(8, 14, 26, 0.8) 0%, rgba(3, 6, 11, 0.95) 100%);
-      border: 1px solid rgba(0, 240, 255, 0.2);
-      border-radius: 28px;
-      padding: 48px;
-      box-shadow: 0 0 50px rgba(0, 240, 255, 0.08);
+    section.feishu-safety-section {
+      margin-bottom: 110px;
+      background: #ffffff;
+      border: 1px solid var(--border-light);
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 8px 30px rgba(15, 23, 42, 0.04);
     }
-    .feishu-grid {
+    .feishu-safety-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 36px;
-      margin-top: 36px;
-    }
-    @media (max-width: 860px) {
-      .feishu-grid { grid-template-columns: 1fr; }
-    }
-    .feishu-pane {
-      background: rgba(13, 21, 38, 0.7);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 20px;
-      padding: 32px;
-      position: relative;
-    }
-    .feishu-stage-badge {
-      font-size: 11px;
-      font-weight: 700;
-      color: #38bdf8;
-      background: rgba(56, 189, 248, 0.12);
-      border: 1px solid rgba(56, 189, 248, 0.3);
-      padding: 4px 12px;
-      border-radius: 30px;
-      display: inline-block;
-      margin-bottom: 18px;
-    }
-    .feishu-pane-title {
-      font-size: 22px;
-      font-weight: 700;
-      color: #fff;
-      margin-bottom: 12px;
-    }
-    .feishu-diagram-box {
-      background: #03060c;
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 12px;
-      padding: 18px;
-      margin: 20px 0;
-      font-family: var(--font-mono);
-      font-size: 12px;
-      line-height: 1.9;
-    }
-    .diagram-step-line {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .arr { color: var(--text-3); font-weight: bold; }
-
-    /* ═════════════════════════════════════════════════════
-       大厂工业级成对护栏量化矩阵 (Scorecard Table)
-       ═════════════════════════════════════════════════════ */
-    section.scorecard-section {
-      margin-bottom: 120px;
-    }
-    .scorecard-shell {
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: 20px;
-      overflow: hidden;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      gap: 32px;
       margin-top: 32px;
     }
-    table.guardrail-table {
+    @media (max-width: 820px) {
+      .feishu-safety-grid { grid-template-columns: 1fr; }
+    }
+    .feishu-box-light {
+      background: #f8fafc;
+      border: 1px solid var(--border-light);
+      border-radius: 14px;
+      padding: 24px;
+    }
+    .feishu-tag-pill {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      color: #0369a1;
+      background: #e0f2fe;
+      padding: 3px 10px;
+      border-radius: 20px;
+      margin-bottom: 12px;
+    }
+    .feishu-box-h3 {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-heading);
+      margin-bottom: 8px;
+    }
+    .feishu-step-diagram-light {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 14px;
+      margin: 16px 0;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: #1e293b;
+      line-height: 1.8;
+    }
+    .diag-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .diag-arrow { color: #94a3b8; }
+
+    /* ═════════════════════════════════════════════════════
+       量化成对安全护栏 (Guardrails Scorecard Table)
+       ═════════════════════════════════════════════════════ */
+    section.scorecard-guardrail-section {
+      margin-bottom: 110px;
+    }
+    .table-container-light {
+      background: #ffffff;
+      border: 1px solid var(--border-light);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04);
+      margin-top: 24px;
+    }
+    table.table-light {
       width: 100%;
       border-collapse: collapse;
       font-size: 13.5px;
       text-align: left;
     }
-    table.guardrail-table th {
-      background: rgba(255, 255, 255, 0.04);
-      padding: 16px 24px;
-      color: var(--text-2);
-      font-weight: 600;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    table.table-light th {
+      background: #f8fafc;
+      padding: 14px 20px;
+      color: var(--text-muted);
+      font-weight: 700;
+      border-bottom: 1px solid var(--border-light);
       font-size: 12px;
       text-transform: uppercase;
-      letter-spacing: 0.6px;
+      letter-spacing: 0.5px;
     }
-    table.guardrail-table td {
-      padding: 18px 24px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-      color: #e2e8f0;
+    table.table-light td {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-light);
+      color: var(--text-body);
     }
-    table.guardrail-table tr:hover td {
-      background: rgba(255, 255, 255, 0.025);
+    table.table-light tr:hover td {
+      background: #f8fafc;
     }
-    .green-badge {
-      color: var(--emerald-core);
+    .guardrail-verified {
+      color: #059669;
       font-weight: 700;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 4px;
     }
 
     /* ═════════════════════════════════════════════════════
-       答辩演练折叠面板 (Defense FAQ)
+       答辩安全质询指南 (Defense FAQ)
        ═════════════════════════════════════════════════════ */
-    section.defense-section {
-      margin-bottom: 100px;
+    section.defense-faq-section {
+      margin-bottom: 90px;
     }
-    .accordion-wrap {
+    .faq-accordion-light {
       display: flex;
       flex-direction: column;
-      gap: 16px;
-      margin-top: 32px;
+      gap: 14px;
+      margin-top: 24px;
     }
-    .accordion-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: 16px;
+    .faq-card-light {
+      background: #ffffff;
+      border: 1px solid var(--border-light);
+      border-radius: 12px;
       overflow: hidden;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.02);
       transition: border-color 0.2s;
     }
-    .accordion-card.is-open {
-      border-color: rgba(0, 240, 255, 0.35);
-      box-shadow: 0 8px 30px rgba(0, 240, 255, 0.08);
+    .faq-card-light.is-open {
+      border-color: #94a3b8;
+      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
     }
-    .acc-header {
-      padding: 22px 28px;
-      font-size: 16px;
-      font-weight: 600;
-      color: #fff;
+    .faq-title-bar {
+      padding: 18px 22px;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-heading);
       cursor: pointer;
       display: flex;
       justify-content: space-between;
       align-items: center;
       user-select: none;
     }
-    .acc-header:hover { color: var(--cyan-core); }
-    .acc-body {
-      padding: 0 28px 24px;
-      font-size: 14px;
-      color: var(--text-2);
-      line-height: 1.75;
+    .faq-title-bar:hover { color: var(--brand-blue); }
+    .faq-content-box {
+      padding: 0 22px 18px;
+      font-size: 13.5px;
+      color: var(--text-body);
+      line-height: 1.7;
       display: none;
-      border-top: 1px solid rgba(255, 255, 255, 0.05);
-      padding-top: 18px;
+      border-top: 1px solid #f1f5f9;
+      padding-top: 14px;
     }
-    .accordion-card.is-open .acc-body { display: block; }
-    .accordion-card.is-open .acc-header { color: var(--cyan-core); }
+    .faq-card-light.is-open .faq-content-box { display: block; }
+    .faq-card-light.is-open .faq-title-bar { color: var(--brand-blue); }
 
     /* 页脚 */
-    footer.global-footer {
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-      padding: 48px 32px;
+    footer.light-footer {
+      border-top: 1px solid var(--border-light);
+      padding: 40px 24px;
       text-align: center;
-      color: var(--text-3);
+      color: var(--text-muted);
       font-size: 13px;
+      background: #ffffff;
     }
   </style>
 </head>
 <body>
 
-  <!-- 顶部科技导航栏 -->
-  <header class="top-nav">
-    <div class="brand-section">
-      <div class="brand-symbol">
+  <!-- 顶部导航栏 -->
+  <header class="nav-header">
+    <div class="nav-brand">
+      <div class="brand-icon-box">
         <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
       </div>
-      <span class="brand-text">NovaPilot</span>
-      <span class="pioneer-chip">AI 先锋大赛 · 12强决赛展厅</span>
+      <span class="brand-name">NovaPilot</span>
+      <span class="talent-badge">AI 未来人才大赛 · 全国总决赛</span>
     </div>
 
-    <nav class="nav-links">
-      <a href="#theater">操作视频展厅</a>
-      <a href="#blueprint">技术架构全景</a>
+    <nav class="nav-menu">
+      <a href="#video-theater">安全操作展厅</a>
+      <a href="#safety-arch">安全防线架构</a>
       <a href="#feishu-loop">飞书双向协同</a>
-      <a href="#guardrails">成对量化护栏</a>
-      <a href="#qa-defense">评委答辩指南</a>
+      <a href="#guardrails">成对安全护栏</a>
+      <a href="#defense-faq">评委安全答辩</a>
     </nav>
 
-    <div class="nav-cta-wrap">
-      <a href="http://localhost:3210" target="_blank" class="btn-launch">
+    <div>
+      <a href="http://localhost:3210" target="_blank" class="nav-btn">
         <span>启动系统工作台</span>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
       </a>
     </div>
   </header>
 
-  <main class="main-body">
+  <main class="main-content">
 
-    <!-- Hero Section -->
-    <section class="hero-section">
-      <div class="hero-badge-pill">
-        <span>🧬 面向生命科学复杂技术服务的「科研决策操作系统」</span>
+    <!-- 顶部英雄区 (Hero) -->
+    <section class="hero-banner">
+      <div class="safety-pill-tag">
+        <span>🛡️ 突破通用 ChatBot 玩具形态 · 专为生命科学打造的「科研决策编译器」</span>
       </div>
-      <h1 class="hero-title">
-        把科研咨询与实验方案，<br>
-        做成<span class="glow-text">可审计、带护栏的决策编译器</span>
+      <h1 class="hero-h1">
+        以确定性状态机对抗大模型幻觉，<br>
+        守护<span class="safety-highlight">科研临床决策的核心安全底线</span>
       </h1>
-      <p class="hero-subtitle">
-        摒弃浮躁泛聊天的 AI 玩具。NovaPilot 扎根重度降解 FFPE 样本高风险转录组测序深水区，
-        通过“Actor 草拟 ➔ Critic 严审 ➔ 飞书群认领 ➔ 多维表格质检”实现工业级确定性闭环。
+      <p class="hero-desc">
+        在科研技术服务中，AI 胡编乱造会导致数十万高价值样本报废。
+        NovaPilot 将不确定的语言生成，收敛为严格带护栏的决策状态机：
+        “范围契约 ➔ Actor 检索 ➔ Critic 反事实严审 ➔ 四层防线 ➔ 飞书协同闭环”。
       </p>
 
-      <!-- 顶格关键指标 Bento -->
-      <div class="hero-metrics-bento">
-        <div class="metric-card" style="--accent-color: var(--emerald-core);">
-          <div class="metric-val">538<small>/ 538</small></div>
-          <div class="metric-name">Vitest 单测 100% 绿灯</div>
-          <div class="metric-sub">45 个测试文件零回归，含 DDL 与 WAL</div>
+      <!-- 核心安全指标卡 (Safety Metrics) -->
+      <div class="safety-metrics-grid">
+        <div class="safety-metric-box">
+          <div class="metric-head">
+            <span style="color: #059669;">●</span>
+            <span>单测验证防线</span>
+          </div>
+          <div class="metric-number">538<small style="font-size: 16px; color: #64748b;"> / 538</small></div>
+          <div class="metric-label">Vitest 45 套单测全绿</div>
+          <div class="metric-detail">包含 DDL 迁移、WAL 防死锁与断网确定性</div>
         </div>
 
-        <div class="metric-card" style="--accent-color: var(--cyan-core);">
-          <div class="metric-val">0.00%<small>零漏放</small></div>
-          <div class="metric-name">NovaBench 幻觉拦截率</div>
-          <div class="metric-sub">带同源分母严密防刷，绝不放行无据建议</div>
+        <div class="safety-metric-box">
+          <div class="metric-head">
+            <span style="color: #0284c7;">●</span>
+            <span>零幻觉放行</span>
+          </div>
+          <div class="metric-number" style="color: #0284c7;">0.00%</div>
+          <div class="metric-label">NovaBench 幻觉漏放率</div>
+          <div class="metric-detail">强制分子分母成对出数，绝不无据放行</div>
         </div>
 
-        <div class="metric-card" style="--accent-color: #a855f7;">
-          <div class="metric-val">100%<small>全召回</small></div>
-          <div class="metric-name">P0 级高危转接召回率</div>
-          <div class="metric-sub">DV200 灰区与 SOP 冲突强制拦截转交</div>
+        <div class="safety-metric-box">
+          <div class="metric-head">
+            <span style="color: #d97706;">●</span>
+            <span>P0 转接召回</span>
+          </div>
+          <div class="metric-number" style="color: #d97706;">100%</div>
+          <div class="metric-label">高危争议 100% 熔断转交</div>
+          <div class="metric-detail">DV200 灰区与 SOP 冲突强制暂停 AI 下结论</div>
         </div>
 
-        <div class="metric-card" style="--accent-color: #38bdf8;">
-          <div class="metric-val">双向<small>真协同</small></div>
-          <div class="metric-name">飞书卡片 + 多维表格</div>
-          <div class="metric-sub">群内交互式认领 + 质检触发版本固化</div>
+        <div class="safety-metric-box">
+          <div class="metric-head">
+            <span style="color: #2563eb;">●</span>
+            <span>生态双向协同</span>
+          </div>
+          <div class="metric-number" style="color: #2563eb; font-size: 26px;">双向闭环</div>
+          <div class="metric-label">飞书卡片 + 多维表格</div>
+          <div class="metric-detail">群内 15分钟 SLA 认领 + 质检异常版本固化</div>
         </div>
       </div>
     </section>
 
     <!-- ═════════════════════════════════════════════════════
-         核心操作视频展厅 (Cinematic Video Theater)
+         浅色核心操作视频展厅 (Clinical Studio Video Theater)
          ═════════════════════════════════════════════════════ -->
-    <section id="theater" class="video-theater-section">
-      <div class="section-headline-group">
+    <section id="video-theater" class="video-showcase-section">
+      <div class="section-header-block">
         <div>
-          <div class="section-eyebrow">Interactive Video Showcase</div>
-          <h2 class="section-title">核心业务链路 · 沉浸式操作视频展厅</h2>
-          <p class="section-caption">直观还原四大高难度科研攻坚场景（支持录屏即拖即播，或动态实时流式推演）</p>
+          <div class="section-tagline">Clinical Safety Showcase</div>
+          <h2 class="section-title-text">核心业务安全链路 · 操作视频展厅</h2>
+          <p class="section-subtitle-text">四大高难度生信科研场景的真实安全拦截与流式推演（支持本地录屏即拖即播）</p>
         </div>
       </div>
 
-      <div class="cinema-stage-wrap">
-        <!-- 氛围背光 (Ambilight) -->
-        <div class="stage-ambilight" id="screen-ambilight"></div>
-
-        <div class="cinema-box">
-          <!-- 播放器主舞台 -->
-          <div class="cinema-viewport">
-            <div class="cinema-header-bar">
-              <div class="traffic-controls">
-                <span class="ctrl-dot ctrl-red"></span>
-                <span class="ctrl-dot ctrl-yellow"></span>
-                <span class="ctrl-dot ctrl-green"></span>
-              </div>
-              <div class="cinema-live-pill">
-                <span class="live-pulse"></span>
-                <span id="active-scene-indicator">SCENE 01 · SCIENTIFIC DECISION COMPILATION</span>
-              </div>
+      <div class="studio-display-frame">
+        <!-- 视频主舞台 -->
+        <div class="studio-viewport">
+          <div class="studio-titlebar">
+            <div class="window-dots-light">
+              <span class="dot dot-close"></span>
+              <span class="dot dot-min"></span>
+              <span class="dot dot-max"></span>
             </div>
-
-            <!-- 视频/模拟主视口 -->
-            <div class="screen-canvas-area" id="screen-dropzone">
-              <!-- 真实的 MP4 视频播放器 -->
-              <video id="actual-video" playsinline></video>
-
-              <!-- 内置流式动态模拟引擎 (无视频文件时呈现极其生动的科研仿真推演) -->
-              <div class="cyber-sim-screen" id="sim-dashboard">
-                <!-- 左半屏：生信测序监控流水线 -->
-                <div class="sim-left-panel">
-                  <div class="panel-header-mini">
-                    <span>BIO-INFORMATICS TELEMETRY</span>
-                    <span style="color: var(--cyan-core);" id="sample-code-tag">SAMPLE #FFPE-RNA-042</span>
-                  </div>
-                  <!-- 动态色谱波形图 -->
-                  <div class="wave-canvas-wrap">
-                    <canvas id="chromatogram-canvas"></canvas>
-                  </div>
-                  <!-- 实时流式控制台 -->
-                  <div class="terminal-stream-box" id="terminal-stream">
-                    <div class="term-line term-dim">[09:12:01] INGEST >> 接收客户提问: FFPE-RNA 20ng DV200=25%</div>
-                    <div class="term-line">[09:12:02] SCOPE >> 适用范围契约核验通过 (Zod Strict)</div>
-                    <div class="term-line term-cyan">[09:12:03] ACTOR >> RRF 混合检索命中 SOP-042 (超微量规程)</div>
-                    <div class="term-line term-rose">[09:12:04] CRITIC >> 反事实核验拦截: DV200 < 30% 灰区争议!</div>
-                    <div class="term-line">[09:12:05] FEISHU >> 触发 SLA 紧急卡片推送至专家协作群...</div>
-                  </div>
-                </div>
-
-                <!-- 右半屏：决策卡与飞书交互微视窗 -->
-                <div class="sim-right-panel">
-                  <div class="card-topline-mini">
-                    <span class="card-id-badge" id="sim-card-badge">CARD-FFPE-RNA-042</span>
-                    <span class="card-version-badge" id="sim-card-ver">v3.0 (HOLD)</span>
-                  </div>
-                  <div class="sim-card-heading" id="sim-card-title">
-                    临床 FFPE 肿瘤样本超微量 RNA-Seq 建库放行争议
-                  </div>
-                  <div class="sim-risk-strip">
-                    <div>
-                      <div class="sim-risk-text" id="sim-risk-text">CRITIC 拦截 · 需人工转接</div>
-                      <small style="color: #cbd5e1; font-size: 10px;">DV200 低于基线 · SOP 文献冲突</small>
-                    </div>
-                    <div class="sim-risk-val" id="sim-risk-score">86/100</div>
-                  </div>
-
-                  <!-- 飞书群内交互式卡片模拟 -->
-                  <div class="sim-feishu-mini-callout">
-                    <div class="feishu-mini-header">
-                      <span>🚨【飞书 SLA 紧急工单】群内推送</span>
-                    </div>
-                    <p style="font-size: 11px; color: #bae6fd; margin-bottom: 8px;">
-                      已提取: 物种:人 · 16例 · DV200:25% · 限时认领: 15分钟
-                    </p>
-                    <button class="feishu-mini-btn" id="sim-claim-btn" onclick="handleSimClaimClick()">
-                      🙋 认领此案例 (群内直达工作台)
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 控制底栏 -->
-            <div class="cinema-control-bar">
-              <button class="play-btn-circle" id="cinema-play-btn" title="播放 / 暂停">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-              </button>
-              <div class="cinema-scrubber" id="cinema-scrubber">
-                <div class="scrubber-fill" id="cinema-fill"></div>
-              </div>
-              <span class="cinema-time-text" id="cinema-time">00:25 / 01:10</span>
-              <button class="rate-btn" id="cinema-rate-btn">1.0X</button>
-              <button class="rate-btn" id="cinema-fs-btn" title="全屏">⛶</button>
+            <div class="studio-scene-pill">
+              <span class="scene-pulse-dot"></span>
+              <span id="active-scene-title">SAFETY SCENE 01 · 临界灰区样本四层防线拦截</span>
             </div>
           </div>
 
-          <!-- 右侧场景列表 -->
-          <div class="cinema-playlist">
-            <div class="playlist-heading">
-              <span class="playlist-title">高价值场景录屏切换</span>
+          <!-- 屏幕区域 -->
+          <div class="screen-stage" id="video-drop-area">
+            <!-- 真实 MP4 视频播放器 -->
+            <video id="demo-video" playsinline controls></video>
+
+            <!-- 高保真安全实验室模拟仪表盘 (无视频时呈现生动推演) -->
+            <div class="safety-sim-layout" id="safety-sim-canvas">
+              <!-- 左半屏：生信测序质控色谱与哨兵日志 -->
+              <div class="sim-left-card">
+                <div class="sim-card-top">
+                  <span class="sim-card-title">BIO-SAFETY SENTINEL TELEMETRY</span>
+                  <span class="sample-pill" id="sim-sample-id">SAMPLE #FFPE-RNA-042</span>
+                </div>
+                <!-- 动态测序波形 Canvas -->
+                <div class="canvas-box">
+                  <canvas id="wave-canvas"></canvas>
+                </div>
+                <!-- 审计终端 -->
+                <div class="audit-terminal-box">
+                  <div class="term-row t-dim">[10:24:01] 接收客户样本: FFPE 组织 15ng, DV200=24%</div>
+                  <div class="term-row">[10:24:02] SCOPE-GATE >> 强类型契约校验通过 (Zod Strict)</div>
+                  <div class="term-row t-green">[10:24:03] ACTOR >> 检索 SOP-042 推荐超微量建库规程</div>
+                  <div class="term-row t-red">[10:24:04] CRITIC-INTERCEPT >> 反事实审查报警: DV200 &lt; 30% 灰区冲突!</div>
+                  <div class="term-row">[10:24:05] FAIL-SAFE >> 阻断 formal 放行，触发飞书 P0 紧急工单...</div>
+                </div>
+              </div>
+
+              <!-- 右半屏：科学决策卡安全状态机 -->
+              <div class="sim-right-card">
+                <div class="gate-top-row">
+                  <span class="gate-status-tag" id="sim-gate-tag">🛡️ 防线阻断 · 暂停下结论</span>
+                  <span style="font-family: var(--font-mono); font-size: 11px; color: #64748b;" id="sim-ver-text">v1.0 (HOLD)</span>
+                </div>
+                <div class="card-title-mini" id="sim-heading">
+                  临床 FFPE 肿瘤样本超微量 RNA-Seq 建库方案争议
+                </div>
+                <div class="safety-alert-banner">
+                  <div>
+                    <div class="banner-text" id="sim-alert-text">Critic 严审拦截 · 强制人工转接</div>
+                    <small style="color: #b45309; font-size: 10.5px;">DV200 低于基线 · 外部文献冲突</small>
+                  </div>
+                  <div class="banner-score" id="sim-score-box">86/100</div>
+                </div>
+
+                <!-- 飞书微缩交互区 -->
+                <div class="feishu-sla-callout-light">
+                  <div class="sla-head-title">
+                    <span>🚨【飞书 SLA 紧急呼叫】Schema 2.0 卡片已推送</span>
+                  </div>
+                  <div class="sla-desc-text">
+                    已提炼关键事实 · 承诺 15 分钟认领 · 4 小时实质响应
+                  </div>
+                  <button class="sla-claim-btn-light" id="sim-btn-claim" onclick="triggerSimClaim()">
+                    🙋 认领此案例 (双轨直达工作台)
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 控制栏 -->
+          <div class="studio-controlbar">
+            <button class="btn-play-light" id="play-toggle-btn" title="播放 / 暂停">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            </button>
+            <div class="studio-progress" id="progress-track">
+              <div class="progress-bar-fill" id="progress-fill"></div>
+            </div>
+            <span class="time-indicator" id="playback-timer">00:20 / 01:15</span>
+            <button class="btn-tool-light" id="playback-rate-btn">1.0X</button>
+            <button class="btn-tool-light" id="fullscreen-btn" title="全屏">⛶</button>
+          </div>
+        </div>
+
+        <!-- 场景切换侧栏 -->
+        <div class="studio-sidebar">
+          <span class="sidebar-label">核心安全场景演示切换</span>
+
+          <div class="scenes-column">
+            <!-- 场景 1 -->
+            <div class="scene-button-card active-scene" data-scene="1">
+              <div class="scene-card-top">
+                <span class="scene-badge-light">场景 01</span>
+                <span class="scene-duration-light">00:45</span>
+              </div>
+              <div class="scene-name-light">灰区样本防线强制拦截</div>
+              <div class="scene-desc-light">DV200=24% 灰区样本输入，Actor 生成与 Critic 严审对抗，强制拦截无据生成。</div>
             </div>
 
-            <div class="scene-items-col">
-              <!-- 场景 1 -->
-              <div class="scene-item-card scene-selected" data-scene="1">
-                <div class="scene-meta-row">
-                  <span class="scene-tag">SCENE 01</span>
-                  <span class="scene-duration">00:45</span>
-                </div>
-                <div class="scene-item-name">科研决策卡与三层防线拦截</div>
-                <div class="scene-item-desc">DV200=25% 灰区样本输入，Actor 生成与 Critic 严审对抗，强制拦截无据生成。</div>
+            <!-- 场景 2 -->
+            <div class="scene-button-card" data-scene="2">
+              <div class="scene-card-top">
+                <span class="scene-badge-light" style="color: #b91c1c; background: #fef2f2;">场景 02</span>
+                <span class="scene-duration-light">00:38</span>
               </div>
-
-              <!-- 场景 2 -->
-              <div class="scene-item-card" data-scene="2">
-                <div class="scene-meta-row">
-                  <span class="scene-tag" style="color: #f43f5e; background: rgba(244,63,94,0.12);">SCENE 02</span>
-                  <span class="scene-duration">00:38</span>
-                </div>
-                <div class="scene-item-name">飞书卡片 SLA 紧急呼叫</div>
-                <div class="scene-item-desc">P0 高危转接自动推送飞书 Schema 2.0 红色交互卡片，群内一键认领并唤醒工作台。</div>
-              </div>
-
-              <!-- 场景 3 -->
-              <div class="scene-item-card" data-scene="3">
-                <div class="scene-meta-row">
-                  <span class="scene-tag" style="color: #00f5a0; background: rgba(0,245,160,0.12);">SCENE 03</span>
-                  <span class="scene-duration">00:52</span>
-                </div>
-                <div class="scene-item-name">飞书多维表格双向质检闭环</div>
-                <div class="scene-item-desc">正向一键同步至 Bitable；反向质检工程师改合格/不合格，系统自动固化 v3.0 新版本。</div>
-              </div>
-
-              <!-- 场景 4 -->
-              <div class="scene-item-card" data-scene="4">
-                <div class="scene-meta-row">
-                  <span class="scene-tag" style="color: #c084fc; background: rgba(192,132,252,0.12);">SCENE 04</span>
-                  <span class="scene-duration">00:30</span>
-                </div>
-                <div class="scene-item-name">成对护栏监控与零幻觉压测</div>
-                <div class="scene-item-desc">538 个 Vitest 单测实时断言，NovaBench 金标集压测出具分母严格防刷数。</div>
-              </div>
+              <div class="scene-name-light">虚假引用 0% 漏放压测</div>
+              <div class="scene-desc-light">故意输入虚假 SOP 与过期文献，三层防线 100% 识别并阻断，保护样本资产。</div>
             </div>
 
-            <!-- 本地视频上传 Dock -->
-            <div class="video-drop-dock">
-              <div class="dock-title">📹 载入现场录屏文件</div>
-              <div class="dock-tip">可将本地 .mp4/.webm 视频拖入或直接选取</div>
-              <label class="dock-upload-btn" for="local-video-picker">选择本地演示视频</label>
-              <input type="file" id="local-video-picker" accept="video/mp4,video/webm">
+            <!-- 场景 3 -->
+            <div class="scene-button-card" data-scene="3">
+              <div class="scene-card-top">
+                <span class="scene-badge-light" style="color: #0369a1; background: #e0f2fe;">场景 03</span>
+                <span class="scene-duration-light">00:50</span>
+              </div>
+              <div class="scene-name-light">飞书卡片 SLA 紧急呼叫</div>
+              <div class="scene-card-top" style="margin-top: 2px;"></div>
+              <div class="scene-desc-light">P0 高危争议毫秒级推入飞书群，专家群内点击一键认领，SLA 时钟无缝启动。</div>
+            </div>
+
+            <!-- 场景 4 -->
+            <div class="scene-button-card" data-scene="4">
+              <div class="scene-card-top">
+                <span class="scene-badge-light" style="color: #047857; background: #ecfdf5;">场景 04</span>
+                <span class="scene-duration-light">00:35</span>
+              </div>
+              <div class="scene-name-light">质检不合格反向熔断闭环</div>
+              <div class="scene-desc-light">多维表格工程师改「质检不合格」，系统自动生成并固化 v2.0/v3.0 决策卡。</div>
             </div>
           </div>
-        </div>
-      </div>
-    </section>
 
-    <!-- ═════════════════════════════════════════════════════
-         Bento 核心架构全景 (Bento Architecture Blueprint)
-         ═════════════════════════════════════════════════════ -->
-    <section id="blueprint" class="bento-section">
-      <div class="section-headline-group">
-        <div>
-          <div class="section-eyebrow">Engineering Architecture</div>
-          <h2 class="section-title">双环论证中枢 · 核心技术全景</h2>
-          <p class="section-caption">有状态智能体编排 + 四层纵深防御，构筑坚不可摧的科研防线</p>
-        </div>
-      </div>
-
-      <div class="bento-container">
-        <!-- 模块 1 -->
-        <div class="bento-cell bento-col-span-2">
-          <div class="bento-icon-box" style="color: var(--cyan-core);">⚡</div>
-          <h3 class="bento-card-title">Actor-Critic 双环对抗科学论证引擎</h3>
-          <p class="bento-card-desc">
-            拒绝盲目由单一大模型直接下发科研方案。Actor 基于 RRF 混合检索（FTS5 词法 + BGE 512维向量语义空间）起草备选方案；
-            Critic 充当反派科研评审员，针对 SOP 证据链实施「反事实核验（Counterfactual Grounding）」，专挑适用边界超纲与证据冲突。
-          </p>
-          <div class="bento-tag-pills">
-            <span class="bento-tag">RRF 倒数秩融合</span>
-            <span class="bento-tag">Counterfactual Grounding</span>
-            <span class="bento-tag">BGE-small-zh WASM</span>
-            <span class="bento-tag">OTLP 遥测导出</span>
-          </div>
-        </div>
-
-        <!-- 模块 2 -->
-        <div class="bento-cell">
-          <div class="bento-icon-box" style="color: var(--emerald-core);">🎯</div>
-          <h3 class="bento-card-title">强类型范围契约守门</h3>
-          <p class="bento-card-desc">
-            在进入重度检索前，前置校验物种、取材方式、DV200。越出实验服务边界判定直接阻断并转交人工，杜绝给非适用样本乱开药方。
-          </p>
-          <div class="bento-tag-pills">
-            <span class="bento-tag">Zod Strict Schema</span>
-            <span class="bento-tag">Scope Contract</span>
-          </div>
-        </div>
-
-        <!-- 模块 3 -->
-        <div class="bento-cell">
-          <div class="bento-icon-box" style="color: #a855f7;">🛡️</div>
-          <h3 class="bento-card-title">NovaGuard 四层纵深防御</h3>
-          <p class="bento-card-desc">
-            契约层、论证层、接地层与风险层逐级卡死。只有完全通过全部防线的方案才能晋级为 formal 正式决策卡，否则强制转交专家。
-          </p>
-          <div class="bento-tag-pills">
-            <span class="bento-tag">P0 召回 100%</span>
-            <span class="bento-tag">零虚假引用放行</span>
-          </div>
-        </div>
-
-        <!-- 模块 4 -->
-        <div class="bento-cell bento-col-span-2">
-          <div class="bento-icon-box" style="color: #38bdf8;">💾</div>
-          <h3 class="bento-card-title">纯单机确定性存储引擎 (Zero Native Dependencies)</h3>
-          <p class="bento-card-desc">
-            采用 Node 原生内置 `node:sqlite` + WAL 模式，配合 `PRAGMA busy_timeout = 5000` 消除并发死锁。
-            每个任务节点生成严格的 Checkpoint 检查点，断电或网络中断也能无损恢复现场，在断网沙箱中实现 100% 逐位可重现。
-          </p>
-          <div class="bento-tag-pills">
-            <span class="bento-tag">node:sqlite</span>
-            <span class="bento-tag">WAL Checkpoints</span>
-            <span class="bento-tag">离线确定性不变式</span>
+          <!-- 本地录屏上传导入 -->
+          <div class="local-video-importer-light">
+            <div class="upload-title-light">📹 载入现场录屏演示视频</div>
+            <div class="upload-sub-light">支持拖入或选择电脑中的 .mp4 / .webm</div>
+            <label class="btn-file-select-light" for="local-video-file-input">选择本地操作视频</label>
+            <input type="file" id="local-video-file-input" accept="video/mp4,video/webm">
           </div>
         </div>
       </div>
     </section>
 
     <!-- ═════════════════════════════════════════════════════
-         飞书生态双向打通 (Feishu Dual Loop Showcase)
+         围绕安全的架构拆解 (Safety Architecture Blueprint)
          ═════════════════════════════════════════════════════ -->
-    <section id="feishu-loop" class="feishu-ecosystem-section">
-      <div class="section-headline-group">
+    <section id="safety-arch" class="safety-arch-section">
+      <div class="section-header-block">
         <div>
-          <div class="section-eyebrow" style="color: #38bdf8;">Bi-directional Ecosystem</div>
-          <h2 class="section-title">飞书生态双向深度协同（组织级业务闭环）</h2>
-          <p class="section-caption" style="color: #93c5fd;">拒绝单向消息推送玩具。让 AI 与飞书群专家、多维表格质检团队无缝接力。</p>
+          <div class="section-tagline">Defense in Depth</div>
+          <h2 class="section-title-text">以确定性防御为核心的系统架构</h2>
+          <p class="section-subtitle-text">四大严密关卡卡死无据生成，实现生命科学工业级可靠性</p>
         </div>
       </div>
 
-      <div class="feishu-grid">
-        <!-- 飞书特性 1 -->
-        <div class="feishu-pane">
-          <div class="feishu-stage-badge">高感知 01 · 交互式卡片 SLA 紧急呼叫</div>
-          <h3 class="feishu-pane-title">群内一键认领 · SLA 时钟启动</h3>
-          <p style="font-size: 13.5px; color: var(--text-2); line-height: 1.6;">
-            当管线遇到 P0 级别严重争议（如证据冲突、DV200 低于阈值）时，服务端毫秒级推送飞书 Schema 2.0 红色交互卡片至专家协作群。
+      <div class="arch-grid-light">
+        <!-- 关卡 1 -->
+        <div class="arch-card-light">
+          <span class="arch-step-badge">01</span>
+          <div class="arch-icon-box">🎯</div>
+          <h3 class="arch-card-title">强类型适用范围契约 (Scope Contract)</h3>
+          <p class="arch-card-p">
+            严格前置守门：在进入大模型检索前，用 Zod 强校验物种、取材方式、DV200 指标。超出建库服务范围直接拦截并阻断，防止非适用样本产生误导。
+          </p>
+          <div class="arch-tag-row">
+            <span class="arch-tag-pill">Zod Strict</span>
+            <span class="arch-tag-pill">前置硬契约</span>
+          </div>
+        </div>
+
+        <!-- 关卡 2 -->
+        <div class="arch-card-light">
+          <span class="arch-step-badge">02</span>
+          <div class="arch-icon-box" style="background: #fef2f2; color: #dc2626;">⚔️</div>
+          <h3 class="arch-card-title">Actor-Critic 反事实严审对抗</h3>
+          <p class="arch-card-p">
+            拒绝单体大模型直接作答。Actor 基于 RRF 混合检索起草方案；Critic 充当反派科研评审员，专门搜寻 SOP 冲突点与超纲漏洞，不符合严苛标准绝不批准。
+          </p>
+          <div class="arch-tag-row">
+            <span class="arch-tag-pill">反事实核验</span>
+            <span class="arch-tag-pill">SOP 证据对齐</span>
+          </div>
+        </div>
+
+        <!-- 关卡 3 -->
+        <div class="arch-card-light">
+          <span class="arch-step-badge">03</span>
+          <div class="arch-icon-box" style="background: #ecfdf5; color: #059669;">🛡️</div>
+          <h3 class="arch-card-title">四态有限状态机安全兜底 (Fail-Safe)</h3>
+          <p class="arch-card-p">
+            将生成结果约束为 formal（正式卡）、provisional（临时卡）、needs-conditions（缺条件）与 expert-review（人工转接）。正式卡强制绑定 E-SOP 引用编号。
+          </p>
+          <div class="arch-tag-row">
+            <span class="arch-tag-pill">P0 召回率 100%</span>
+            <span class="arch-tag-pill">零幻觉放行</span>
+          </div>
+        </div>
+
+        <!-- 关卡 4 -->
+        <div class="arch-card-light">
+          <span class="arch-step-badge">04</span>
+          <div class="arch-icon-box" style="background: #eff6ff; color: #2563eb;">💾</div>
+          <h3 class="arch-card-title">纯单机确定性存储引擎 (SQLite WAL)</h3>
+          <p class="arch-card-p">
+            Node 原生内置 `node:sqlite` + WAL 模式，配合 busy_timeout 消除锁竞争。每个决策节点写入 Checkpoints 表，断网沙箱中实现 100% 逐位可复现。
+          </p>
+          <div class="arch-tag-row">
+            <span class="arch-tag-pill">零外部依赖</span>
+            <span class="arch-tag-pill">离线不变式</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═════════════════════════════════════════════════════
+         飞书生态双向安全协同 (Feishu Safety Loop)
+         ═════════════════════════════════════════════════════ -->
+    <section id="feishu-loop" class="feishu-safety-section">
+      <div class="section-header-block">
+        <div>
+          <div class="section-tagline" style="color: #0284c7;">Organizational Safety Loop</div>
+          <h2 class="section-title-text">飞书生态双向安全协同（组织级业务闭环）</h2>
+          <p class="section-subtitle-text">打破系统孤岛，让 AI 发现的安全风险秒级直达飞书群专家与质检工程师</p>
+        </div>
+      </div>
+
+      <div class="feishu-safety-grid">
+        <!-- 飞书 1 -->
+        <div class="feishu-box-light">
+          <span class="feishu-tag-pill">安全机制 01 · 飞书交互卡片 SLA 紧急呼叫</span>
+          <h3 class="feishu-box-h3">群内一键认领 · SLA 倒计时启动</h3>
+          <p style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">
+            当系统判定出现证据严重冲突或 DV200 低于阈值时，自动向专家协作群推送 Schema 2.0 红色交互卡片，专家无需切换系统，群内点击即可秒级认领。
           </p>
 
-          <div class="feishu-diagram-box" style="color: #38bdf8;">
-            <div class="diagram-step-line">
+          <div class="feishu-step-diagram-light">
+            <div class="diag-line">
               <span>🚨 争议阻断</span>
-              <span class="arr">➔</span>
+              <span class="diag-arrow">➔</span>
               <span>推入飞书协作群 (红色 Schema 2.0)</span>
             </div>
-            <div class="diagram-step-line">
+            <div class="diag-line">
               <span>🙋 点击认领</span>
-              <span class="arr">➔</span>
-              <span>直达专家工作台 / 回调锁定 claimed_at</span>
+              <span class="diag-arrow">➔</span>
+              <span>直达专家工作台 / 锁定 claimed_at</span>
             </div>
-            <div class="diagram-step-line">
+            <div class="diag-line">
               <span>⏱️ SLA 启动</span>
-              <span class="arr">➔</span>
+              <span class="diag-arrow">➔</span>
               <span>卡片原地刷新为「已认领」绿色状态</span>
             </div>
           </div>
 
-          <p style="font-size: 12px; color: var(--emerald-core); font-weight: 500;">
-            ✓ 双轨兼备：既支持群机器人直达唤醒工作台，亦兼容自建应用 Request URL 原地刷新
+          <p style="font-size: 12px; color: #059669; font-weight: 600;">
+            ✓ 双轨自适应：群机器人模式直达唤起工作台，自建应用模式支持卡片原地刷新
           </p>
         </div>
 
-        <!-- 飞书特性 2 -->
-        <div class="feishu-pane">
-          <div class="feishu-stage-badge" style="color: #c084fc; background: rgba(192,132,252,0.12); border-color: rgba(192,132,252,0.3);">高感知 02 · OpenAPI & Webhook</div>
-          <h3 class="feishu-pane-title">多维表格双向同步 · 质检版本固化</h3>
-          <p style="font-size: 13.5px; color: var(--text-2); line-height: 1.6;">
-            正向一键同步至 Bitable 标准科研表；反向监听质检变更，自动衍生并固化全新卡片版本。
+        <!-- 飞书 2 -->
+        <div class="feishu-box-light">
+          <span class="feishu-tag-pill" style="color: #7c3aed; background: #f5f3ff;">安全机制 02 · 多维表格质检反向熔断</span>
+          <h3 class="feishu-box-h3">多维表格双向同步 · 质检版本进化</h3>
+          <p style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">
+            正向同步科研记录至 Bitable 表格；反向监听质检变更，工程师一旦标记“质检不合格”，系统秒级生成并固化全新卡片版本，注入防损补提对策。
           </p>
 
-          <div class="feishu-diagram-box" style="color: #d8b4fe;">
-            <div class="diagram-step-line">
+          <div class="feishu-step-diagram-light" style="color: #6b21a8;">
+            <div class="diag-line">
               <span>📋 正向建档</span>
-              <span class="arr">➔</span>
+              <span class="diag-arrow">➔</span>
               <span>项目ID/物种/方案/SOP 自动写入多维表格</span>
             </div>
-            <div class="diagram-step-line">
+            <div class="diag-line">
               <span>🔬 质检更新</span>
-              <span class="arr">➔</span>
+              <span class="diag-arrow">➔</span>
               <span>工程师在表格标记「质检合格 / 不合格」</span>
             </div>
-            <div class="diagram-step-line">
+            <div class="diag-line">
               <span>🔄 版本进化</span>
-              <span class="arr">➔</span>
+              <span class="diag-arrow">➔</span>
               <span>系统自动生成并固化全新版本 (v2.0 / v3.0)</span>
             </div>
           </div>
 
-          <p style="font-size: 12px; color: #d8b4fe; font-weight: 500;">
-            ✓ 质检不合格自动注入 P0 规避建议与补送样本规程，版本历史完整可追溯
+          <p style="font-size: 12px; color: #7c3aed; font-weight: 600;">
+            ✓ 质检不合格自动注入 P0 规避建议与样本补提规程，防止产生无效测序损失
           </p>
         </div>
       </div>
     </section>
 
     <!-- ═════════════════════════════════════════════════════
-         大厂工业级成对护栏量化矩阵 (Scorecard Table)
+         量化成对安全护栏 (Guardrails Scorecard Table)
          ═════════════════════════════════════════════════════ -->
-    <section id="guardrails" class="scorecard-section">
-      <div class="section-headline-group">
+    <section id="guardrails" class="scorecard-guardrail-section">
+      <div class="section-header-block">
         <div>
-          <div class="section-eyebrow">Enterprise Metric Rigor</div>
-          <h2 class="section-title">量化指标体系与成对护栏 (Guardrails)</h2>
-          <p class="section-caption">拒绝孤立刷数。每个激励指标在类型层面强制成对出具护栏指标，同源同窗出数</p>
+          <div class="section-tagline">Rigor Metric System</div>
+          <h2 class="section-title-text">量化指标体系与成对安全护栏 (Guardrails)</h2>
+          <p class="section-subtitle-text">拒绝盲目单向刷数。每个激励指标必须配对同源护栏指标，以大厂工业级口径严谨记账</p>
         </div>
       </div>
 
-      <div class="scorecard-shell">
-        <table class="guardrail-table">
+      <div class="table-container-light">
+        <table class="table-light">
           <thead>
             <tr>
-              <th>核心激励目标 (Target)</th>
+              <th>核心激励指标 (Target)</th>
               <th>当前实测值</th>
               <th>成对护栏指标 (Guardrail)</th>
               <th>护栏达标基线</th>
-              <th>业务防御意义</th>
+              <th>安全防御意义</th>
             </tr>
           </thead>
           <tbody>
             <tr>
               <td><strong>AI 安全自主解决率</strong></td>
-              <td><span style="font-family: var(--font-mono); color: var(--cyan-core); font-weight: 700;">61.2%</span></td>
+              <td><span style="font-family: var(--font-mono); color: #0284c7; font-weight: 700;">61.2%</span></td>
               <td><strong>专家复开率 (Re-open Rate)</strong></td>
-              <td><span class="green-badge">✓ &le; 5.0% (实测 2.1%)</span></td>
-              <td>防范 AI 为盲目提高解决率而给出不严谨放行建议</td>
+              <td><span class="guardrail-verified">✓ &le; 5.0% (实测 2.1%)</span></td>
+              <td>防范 AI 为刷高解决率而给出不严谨的错误放行方案</td>
             </tr>
             <tr>
               <td><strong>科研咨询首响时间</strong></td>
-              <td><span style="font-family: var(--font-mono); color: var(--cyan-core); font-weight: 700;">&minus;90% (2.8s)</span></td>
+              <td><span style="font-family: var(--font-mono); color: #0284c7; font-weight: 700;">&minus;90% (2.8s)</span></td>
               <td><strong>P95 首 Token 延迟</strong></td>
-              <td><span class="green-badge">✓ &le; 800ms</span></td>
-              <td>杜绝虚假整卡等待，SSE 流式真实可测量</td>
+              <td><span class="guardrail-verified">✓ &le; 800ms</span></td>
+              <td>真实打通 SSE 流式输出，消除黑盒长延时焦虑</td>
             </tr>
             <tr>
               <td><strong>专家工单处理耗时</strong></td>
-              <td><span style="font-family: var(--font-mono); color: var(--cyan-core); font-weight: 700;">&minus;42.5%</span></td>
-              <td><strong>交接包四要素完整度</strong></td>
-              <td><span class="green-badge">✓ 100% (关键事实齐备)</span></td>
-              <td>确保接手即可做出技术判断，不必向客户重问一遍事实</td>
+              <td><span style="font-family: var(--font-mono); color: #0284c7; font-weight: 700;">&minus;42.5%</span></td>
+              <td><strong>交接包关键事实完整度</strong></td>
+              <td><span class="guardrail-verified">✓ 100% (四要素齐备)</span></td>
+              <td>接手即可做出技术判断，不必向客户重问一遍事实</td>
             </tr>
             <tr>
-              <td><strong>高风险/争议转接召回</strong></td>
-              <td><span style="font-family: var(--font-mono); color: var(--cyan-core); font-weight: 700;">100%</span></td>
+              <td><strong>高风险/争议拦截召回</strong></td>
+              <td><span style="font-family: var(--font-mono); color: #0284c7; font-weight: 700;">100%</span></td>
               <td><strong>NovaBench 幻觉漏放率</strong></td>
-              <td><span class="green-badge">✓ 0.00% (分子分母成对)</span></td>
-              <td>离开分母的零漏放是假安全，强制同源记账审计</td>
+              <td><span class="guardrail-verified">✓ 0.00% (分子分母成对)</span></td>
+              <td>离开分母的零漏放是假安全，强制同源记账审计防刷数</td>
             </tr>
           </tbody>
         </table>
@@ -1482,46 +1390,46 @@
     </section>
 
     <!-- ═════════════════════════════════════════════════════
-         答辩演练折叠面板 (Defense FAQ)
+         答辩安全质询指南 (Defense FAQ)
          ═════════════════════════════════════════════════════ -->
-    <section id="qa-defense" class="defense-section">
-      <div class="section-headline-group">
+    <section id="defense-faq" class="defense-faq-section">
+      <div class="section-header-block">
         <div>
-          <div class="section-eyebrow">Jury Defense Readiness</div>
-          <h2 class="section-title">评委现场答辩高频追问指南</h2>
-          <p class="section-caption">预判命题企业、高校学者与飞书评委核心关注点，提前演练应对</p>
+          <div class="section-tagline">Jury Defense FAQ</div>
+          <h2 class="section-title-text">评委安全质询高频问答应答</h2>
+          <p class="section-subtitle-text">针对企业评委、高校学者与飞书专家最严苛的安全质疑，给出掷地有声的答辩话术</p>
         </div>
       </div>
 
-      <div class="accordion-wrap">
-        <div class="accordion-card is-open">
-          <div class="acc-header">
-            <span>Q1 (企业评委): 生信临床样本极其珍贵，万一 AI 推荐方案错了造成整批样本报废，谁来负责？安全底线在哪？</span>
+      <div class="faq-accordion-light">
+        <div class="faq-card-light is-open">
+          <div class="faq-title-bar">
+            <span>Q1 (命题企业评委): 生信临床样本极其珍贵，万一 AI 推荐方案错了造成整批样本报废，谁来负责？安全底线在哪？</span>
             <span>▾</span>
           </div>
-          <div class="acc-body">
+          <div class="faq-content-box">
             <strong>核心应答应答：</strong>
-            NovaPilot 坚持「科研决策编译器」定位。凡遇到证据冲突、DV200 处于灰区（如 < 30%）或超出 SOP 适用范围时，三层防线强制阻断正式放行（formal），统一降级为 provisional 并推入专家复核队列；正式卡的每条建议强制绑定 E-SOP 编号，从物理机制上杜绝无据生成。
+            NovaPilot 坚持「科研决策编译器」定位。凡遇到证据冲突、DV200 处于灰区（如 &lt; 30%）或超出 SOP 适用范围时，三层防线强制阻断正式放行（formal），统一降级为 provisional 并推入专家复核队列；正式卡的每条建议强制绑定 E-SOP 编号，从物理机制上杜绝无据生成。
           </div>
         </div>
 
-        <div class="accordion-card">
-          <div class="acc-header">
+        <div class="faq-card-light">
+          <div class="faq-title-bar">
             <span>Q2 (高校学者评委): 你们设计的 Actor-Critic 双环编排和通用 LangGraph 相比，有什么原创技术细节？</span>
             <span>▾</span>
           </div>
-          <div class="acc-body">
+          <div class="faq-content-box">
             <strong>核心应答应答：</strong>
             不仅是正向生成，而是专为科学论证设计的「反事实核验（Counterfactual Grounding）」。Critic 不看方案好坏，而是专挑超范围漏洞；编排中引入任务状态检查点（Checkpoints），每次节点流转均落库 SQLite，即使服务器宕机或网络中断也能无损恢复现场，解决传统 Agent 挂死难题。
           </div>
         </div>
 
-        <div class="accordion-card">
-          <div class="acc-header">
+        <div class="faq-card-light">
+          <div class="faq-title-bar">
             <span>Q3 (飞书生态专家): 很多项目都接了飞书，你们的飞书协同有何不同？如何体现组织级资产沉淀？</span>
             <span>▾</span>
           </div>
-          <div class="acc-body">
+          <div class="faq-content-box">
             <strong>核心应答应答：</strong>
             我们实现了真正的「双向闭环」：群内交互卡片一键认领启动 SLA 时钟；多维表格中质检工程师改合格/不合格状态，本地系统即刻自动生成并固化全新卡片版本；专家办结的修订方案经门禁批准后，自动提炼为企业候选知识（Candidate Knowledge），实现组织经验的反哺沉淀。
           </div>
@@ -1531,109 +1439,98 @@
 
   </main>
 
-  <!-- 页面底栏 -->
-  <footer class="global-footer">
-    <p>NovaPilot · 面向生命科学技术的科研决策操作系统 | 全国 AI 先锋大赛 12强决赛展厅</p>
-    <p style="margin-top: 6px; font-size: 11px;">Powered by Next.js 15, node:sqlite, ONNX WASM & Feishu Ecosystem</p>
+  <footer class="light-footer">
+    <p>NovaPilot · 面向生命科学技术的科研决策操作系统 | 全国 AI 未来人才大赛 全国总决赛参展项目</p>
+    <p style="margin-top: 6px; font-size: 11px; color: #94a3b8;">Powered by Next.js 15, node:sqlite, ONNX WASM & Feishu Ecosystem</p>
   </footer>
 
   <!-- 交互逻辑脚本 -->
   <script>
-    // 场景数据字典
-    const SCENES = {
+    const SAFETY_SCENES = {
       1: {
-        tag: "SCENE 01 · SCIENTIFIC DECISION COMPILATION",
-        sampleCode: "SAMPLE #FFPE-RNA-042",
-        cardTitle: "临床 FFPE 肿瘤样本超微量 RNA-Seq 建库放行争议",
-        riskScore: "86/100",
-        riskDesc: "CRITIC 拦截 · 需人工转接",
-        badge: "CARD-FFPE-RNA-042",
-        ver: "v3.0 (HOLD)",
-        ambilight: "radial-gradient(circle at 50% 50%, rgba(0, 240, 255, 0.3) 0%, rgba(138, 43, 226, 0.2) 40%, transparent 70%)",
+        tag: "SAFETY SCENE 01 · 临界灰区样本四层防线拦截",
+        sample: "SAMPLE #FFPE-RNA-042",
+        heading: "临床 FFPE 肿瘤样本超微量 RNA-Seq 建库方案争议",
+        gate: "🛡️ 防线阻断 · 暂停下结论",
+        ver: "v1.0 (HOLD)",
+        alertText: "Critic 严审拦截 · 强制人工转接",
+        score: "86/100",
         time: "00:45"
       },
       2: {
-        tag: "SCENE 02 · FEISHU SLA EMERGENCY CALL",
-        sampleCode: "FEISHU PUSH #P0-ALERT",
-        cardTitle: "【飞书紧急工单】Schema 2.0 交互卡片已推达专家群",
-        riskScore: "90/100",
-        riskDesc: "P0 高危转接 · 15分钟 SLA 承诺",
-        badge: "CASE-NP-P0-ALERT",
-        ver: "AWAITING CLAIM",
-        ambilight: "radial-gradient(circle at 50% 50%, rgba(244, 63, 94, 0.35) 0%, rgba(138, 43, 226, 0.25) 40%, transparent 70%)",
+        tag: "SAFETY SCENE 02 · 虚假文献与过期 SOP 0% 漏放压测",
+        sample: "ATTACK #HALLUCINATION-SET",
+        heading: "注入对抗性伪造文献 E-PMID-FAKE · 触发接地熔断",
+        gate: "🚫 幻觉熔断 · 证据链不匹配",
+        ver: "ZERO-LEAKAGE",
+        alertText: "接地循环未闭合 · 拒绝放行",
+        score: "0.00% 漏放",
         time: "00:38"
       },
       3: {
-        tag: "SCENE 03 · BITABLE QC BI-DIRECTIONAL CLOSED-LOOP",
-        sampleCode: "BITABLE #SYNC-LOOP",
-        cardTitle: "多维表格标记「质检不合格」➔ 自动衍生并固化 v3.0",
-        riskScore: "88/100",
-        riskDesc: "质检异常拦截 · 注入重提对策",
-        badge: "CARD-PROJ-888",
-        ver: "v3.0 (PROVISIONAL)",
-        ambilight: "radial-gradient(circle at 50% 50%, rgba(0, 245, 160, 0.3) 0%, rgba(0, 240, 255, 0.2) 40%, transparent 70%)",
-        time: "00:52"
+        tag: "SAFETY SCENE 03 · 飞书卡片 SLA 15分钟紧急呼叫闭环",
+        sample: "FEISHU #P0-SLA-ALARM",
+        heading: "P0 级严重争议推送至飞书科研协作群 (Schema 2.0)",
+        gate: "🚨 飞书协作 · 专家认领中",
+        ver: "AWAITING CLAIM",
+        alertText: "SLA 时限承诺: 15分钟认领 · 4小时结案",
+        score: "SLA ACTIVE",
+        time: "00:50"
       },
       4: {
-        tag: "SCENE 04 · GUARDRAIL SCORECARD & ZERO HALLUCINATION",
-        sampleCode: "BENCH #538-TESTS",
-        cardTitle: "538 个 Vitest 单测实时断言 · NovaBench 零幻觉放行",
-        riskScore: "0.00%",
-        riskDesc: "幻觉漏放率严格为零 · 成对出数",
-        badge: "BENCH-GOLD-SET",
-        ver: "ALL GREEN",
-        ambilight: "radial-gradient(circle at 50% 50%, rgba(168, 85, 247, 0.35) 0%, rgba(0, 240, 255, 0.2) 40%, transparent 70%)",
-        time: "00:30"
+        tag: "SAFETY SCENE 04 · 多维表格质检不合格反向熔断防损",
+        sample: "BITABLE #QC-FAIL-FEEDBACK",
+        heading: "质检工程师标记「不合格」 ➔ 固化 v3.0 样本纯化对策",
+        gate: "🛑 测序熔断 · 注入补提对策",
+        ver: "v3.0 PERSISTED",
+        alertText: "暂缓上机测序 · 避免万元损失",
+        score: "v3.0 固化",
+        time: "00:35"
       }
     };
 
-    // DOM 元素引用
-    const sceneCards = document.querySelectorAll(".scene-item-card");
-    const indicator = document.getElementById("active-scene-indicator");
-    const sampleTag = document.getElementById("sample-code-tag");
-    const cardTitle = document.getElementById("sim-card-title");
-    const riskScore = document.getElementById("sim-risk-score");
-    const riskText = document.getElementById("sim-risk-text");
-    const cardBadge = document.getElementById("sim-card-badge");
-    const cardVer = document.getElementById("sim-card-ver");
-    const ambilight = document.getElementById("screen-ambilight");
-    const cinemaTime = document.getElementById("cinema-time");
-    const videoTag = document.getElementById("actual-video");
-    const simDashboard = document.getElementById("sim-dashboard");
-    const playBtn = document.getElementById("cinema-play-btn");
-    const scrubberFill = document.getElementById("cinema-fill");
-    const rateBtn = document.getElementById("cinema-rate-btn");
+    const sceneCards = document.querySelectorAll(".scene-button-card");
+    const sceneTag = document.getElementById("active-scene-title");
+    const sampleId = document.getElementById("sim-sample-id");
+    const simHeading = document.getElementById("sim-heading");
+    const gateTag = document.getElementById("sim-gate-tag");
+    const verText = document.getElementById("sim-ver-text");
+    const alertText = document.getElementById("sim-alert-text");
+    const scoreBox = document.getElementById("sim-score-box");
+    const timerText = document.getElementById("playback-timer");
+    const progressFill = document.getElementById("progress-fill");
+    const videoElem = document.getElementById("demo-video");
+    const playBtn = document.getElementById("play-toggle-btn");
+    const rateBtn = document.getElementById("playback-rate-btn");
 
-    // 场景切换
     sceneCards.forEach(card => {
       card.addEventListener("click", () => {
-        sceneCards.forEach(c => c.classList.remove("scene-selected"));
-        card.classList.add("scene-selected");
-        const s = SCENES[card.dataset.scene];
+        sceneCards.forEach(c => c.classList.remove("active-scene"));
+        card.classList.add("active-scene");
+        const s = SAFETY_SCENES[card.dataset.scene];
         if (s) {
-          indicator.textContent = s.tag;
-          sampleTag.textContent = s.sampleCode;
-          cardTitle.textContent = s.cardTitle;
-          riskScore.textContent = s.riskScore;
-          riskText.textContent = s.riskDesc;
-          cardBadge.textContent = s.badge;
-          cardVer.textContent = s.ver;
-          ambilight.style.background = s.ambilight;
-          cinemaTime.textContent = `00:00 / ${s.time}`;
-          scrubberFill.style.width = "0%";
+          sceneTag.textContent = s.tag;
+          sampleId.textContent = s.sample;
+          simHeading.textContent = s.heading;
+          gateTag.textContent = s.gate;
+          verText.textContent = s.ver;
+          alertText.textContent = s.alertText;
+          scoreBox.textContent = s.score;
+          timerText.textContent = `00:00 / ${s.time}`;
+          progressFill.style.width = "0%";
         }
       });
     });
 
-    // 动态波形色谱 Canvas 绘制 (科技感流动波形)
-    const canvas = document.getElementById("chromatogram-canvas");
+    // 动态波形 Canvas 绘制
+    const canvas = document.getElementById("wave-canvas");
     const ctx = canvas.getContext("2d");
     let waveOffset = 0;
 
     function resizeCanvas() {
       if (!canvas) return;
       canvas.width = canvas.offsetWidth * window.devicePixelRatio || 300;
-      canvas.height = canvas.offsetHeight * window.devicePixelRatio || 75;
+      canvas.height = canvas.offsetHeight * window.devicePixelRatio || 70;
     }
     window.addEventListener("resize", resizeCanvas);
     resizeCanvas();
@@ -1644,29 +1541,26 @@
       const w = canvas.width;
       const h = canvas.height;
 
+      // 主色谱波形
       ctx.beginPath();
-      ctx.moveTo(0, h * 0.7);
+      ctx.moveTo(0, h * 0.65);
       for (let x = 0; x < w; x += 4) {
-        const y = h * 0.65 - Math.sin((x + waveOffset) * 0.04) * (h * 0.22) - Math.cos(x * 0.02) * (h * 0.1);
+        const y = h * 0.6 - Math.sin((x + waveOffset) * 0.04) * (h * 0.2) - Math.cos(x * 0.02) * (h * 0.1);
         ctx.lineTo(x, y);
       }
-      ctx.strokeStyle = "#00f0ff";
-      ctx.lineWidth = 2.5;
-      ctx.shadowColor = "#00f0ff";
-      ctx.shadowBlur = 8;
+      ctx.strokeStyle = "#0284c7";
+      ctx.lineWidth = 2.2;
       ctx.stroke();
 
-      // 次级电泳荧光波形
+      // 次级荧光波形
       ctx.beginPath();
-      ctx.moveTo(0, h * 0.8);
+      ctx.moveTo(0, h * 0.75);
       for (let x = 0; x < w; x += 4) {
-        const y = h * 0.75 - Math.cos((x + waveOffset * 0.8) * 0.035) * (h * 0.16);
+        const y = h * 0.7 - Math.cos((x + waveOffset * 0.7) * 0.035) * (h * 0.15);
         ctx.lineTo(x, y);
       }
-      ctx.strokeStyle = "rgba(0, 245, 160, 0.7)";
-      ctx.lineWidth = 1.8;
-      ctx.shadowColor = "#00f5a0";
-      ctx.shadowBlur = 6;
+      ctx.strokeStyle = "#0d9488";
+      ctx.lineWidth = 1.6;
       ctx.stroke();
 
       waveOffset += 2;
@@ -1674,89 +1568,90 @@
     }
     requestAnimationFrame(drawWave);
 
-    // 本地录屏视频载入功能
-    const filePicker = document.getElementById("local-video-picker");
+    // 本地录屏导入功能
+    const filePicker = document.getElementById("local-video-file-input");
     filePicker.addEventListener("change", (e) => {
       const file = e.target.files[0];
       if (!file) return;
       const url = URL.createObjectURL(file);
-      videoTag.src = url;
-      videoTag.classList.add("video-active");
-      simDashboard.style.display = "none";
-      videoTag.play();
-      updatePlayIcon(true);
+      videoElem.src = url;
+      videoElem.classList.add("active-video");
+      document.getElementById("safety-sim-canvas").style.display = "none";
+      videoElem.play();
+      updatePlayBtnState(true);
     });
 
-    // 拖拽导入视频
-    const dropzone = document.getElementById("screen-dropzone");
-    dropzone.addEventListener("dragover", (e) => {
+    // 拖拽导入
+    const dropArea = document.getElementById("video-drop-area");
+    dropArea.addEventListener("dragover", (e) => {
       e.preventDefault();
-      dropzone.style.borderColor = "var(--cyan-core)";
+      dropArea.style.boxShadow = "inset 0 0 0 2px #0284c7";
     });
-    dropzone.addEventListener("dragleave", () => {
-      dropzone.style.borderColor = "transparent";
+    dropArea.addEventListener("dragleave", () => {
+      dropArea.style.boxShadow = "none";
     });
-    dropzone.addEventListener("drop", (e) => {
+    dropArea.addEventListener("drop", (e) => {
       e.preventDefault();
+      dropArea.style.boxShadow = "none";
       const file = e.dataTransfer.files[0];
       if (file && (file.type.includes("video") || file.name.endsWith(".mp4") || file.name.endsWith(".webm"))) {
         const url = URL.createObjectURL(file);
-        videoTag.src = url;
-        videoTag.classList.add("video-active");
-        simDashboard.style.display = "none";
-        videoTag.play();
-        updatePlayIcon(true);
+        videoElem.src = url;
+        videoElem.classList.add("active-video");
+        document.getElementById("safety-sim-canvas").style.display = "none";
+        videoElem.play();
+        updatePlayBtnState(true);
       }
     });
 
-    // 播放按钮状态
+    // 播放控制
     playBtn.addEventListener("click", () => {
-      if (videoTag.classList.contains("video-active")) {
-        if (videoTag.paused) {
-          videoTag.play();
-          updatePlayIcon(true);
+      if (videoElem.classList.contains("active-video")) {
+        if (videoElem.paused) {
+          videoElem.play();
+          updatePlayBtnState(true);
         } else {
-          videoTag.pause();
-          updatePlayIcon(false);
+          videoElem.pause();
+          updatePlayBtnState(false);
         }
       } else {
-        let cur = parseFloat(scrubberFill.style.width) || 0;
+        let cur = parseFloat(progressFill.style.width) || 0;
         cur = (cur + 20) % 100;
-        scrubberFill.style.width = cur + "%";
+        progressFill.style.width = cur + "%";
       }
     });
 
-    function updatePlayIcon(isPlaying) {
+    function updatePlayBtnState(isPlaying) {
       playBtn.innerHTML = isPlaying
-        ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`
-        : `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
+        ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`
+        : `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
     }
 
-    if (videoTag) {
-      videoTag.addEventListener("timeupdate", () => {
-        if (!videoTag.duration) return;
-        const pct = (videoTag.currentTime / videoTag.duration) * 100;
-        scrubberFill.style.width = pct + "%";
+    if (videoElem) {
+      videoElem.addEventListener("timeupdate", () => {
+        if (!videoElem.duration) return;
+        const pct = (videoElem.currentTime / videoElem.duration) * 100;
+        progressFill.style.width = pct + "%";
         const fmt = s => Math.floor(s / 60).toString().padStart(2, '0') + ':' + Math.floor(s % 60).toString().padStart(2, '0');
-        cinemaTime.textContent = `${fmt(videoTag.currentTime)} / ${fmt(videoTag.duration)}`;
+        timerText.textContent = `${fmt(videoElem.currentTime)} / ${fmt(videoElem.duration)}`;
       });
     }
 
-    // 倍速控制
+    // 倍速
     const speeds = [1.0, 1.25, 1.5, 2.0];
     let spdIndex = 0;
     rateBtn.addEventListener("click", () => {
       spdIndex = (spdIndex + 1) % speeds.length;
       const s = speeds[spdIndex];
       rateBtn.textContent = s.toFixed(1) + "X";
-      if (videoTag.classList.contains("video-active")) {
-        videoTag.playbackRate = s;
+      if (videoElem.classList.contains("active-video")) {
+        videoElem.playbackRate = s;
       }
     });
 
-    // 全屏控制
-    document.getElementById("cinema-fs-btn").addEventListener("click", () => {
-      const area = document.querySelector(".cinema-viewport");
+    // 全屏
+    document.getElementById("fullscreen-btn").addEventListener("click", () => {
+      const area = document.querySelector(".studio-viewport");
       if (document.fullscreenElement) {
         document.exitFullscreen();
       } else {
@@ -1764,22 +1659,20 @@
       }
     });
 
-    // 模拟点击飞书认领按钮
-    function handleSimClaimClick() {
-      const btn = document.getElementById("sim-claim-btn");
+    // 飞书认领交互触发
+    function triggerSimClaim() {
+      const btn = document.getElementById("sim-btn-claim");
       btn.textContent = "✅ 已成功认领 (SLA 倒计时启动)";
       btn.style.background = "#059669";
-      btn.style.boxShadow = "0 0 15px rgba(5, 150, 105, 0.6)";
       setTimeout(() => {
-        btn.textContent = "🙋 认领此案例 (群内直达工作台)";
-        btn.style.background = "#0284c7";
-        btn.style.boxShadow = "0 2px 10px rgba(2, 132, 199, 0.4)";
+        btn.textContent = "🙋 认领此案例 (双轨直达工作台)";
+        btn.style.background = "#2563eb";
       }, 3500);
     }
 
-    // 答辩折叠面板切换
-    document.querySelectorAll(".accordion-card").forEach(card => {
-      card.querySelector(".acc-header").addEventListener("click", () => {
+    // FAQ 问答切换
+    document.querySelectorAll(".faq-card-light").forEach(card => {
+      card.querySelector(".faq-title-bar").addEventListener("click", () => {
         card.classList.toggle("is-open");
       });
     });
